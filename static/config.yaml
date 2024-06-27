@@ -1,0 +1,49 @@
+# AI Notebook Configuration
+
+# OpenAI API Settings
+openai:
+  api_key: xxxx
+  api_endpoint: https://api.openai.com/v1/assisstants
+  model: gpt-4o
+  max_tokens: 300
+  
+claude:
+  api_key: xxxx
+  model: claude-3-5-sonnet-20240620
+  max_tokens: 1024
+  
+# Canvas Settings
+canvas:
+  default_width: 800
+  default_height: 600
+  line_color: '#000000'
+  line_width: 2
+  selection_color: 'rgba(0, 0, 255, 0.3)'
+
+# Application Settings
+app:
+  max_notebook_items: 1000  # Maximum number of items to store
+  hover_delay: 300  # Milliseconds before showing hover information
+
+# AI Response Settings
+ai_response:
+  transcription_prompt: "Transcribe any handwritten text in this image and return the transcription as a string with no other information."
+  image_description_prompt: "first look for any hand written text and transcribe it."
+  tag_generation_prompt: "Generate up to 5 tags for the content of this image."
+
+# Storage Settings
+storage:
+  key: 'ai_notebook_data'  # localStorage key for notebook data
+
+# Export Settings
+export:
+  filename: 'ai_notebook_export.json'  # Default filename for exported data
+
+# Styling
+styles:
+  primary_color: '#007bff'
+  secondary_color: '#6c757d'
+  background_color: '#ffffff'
+  text_color: '#333333'
+  font_family: 'Arial, sans-serif'
+  

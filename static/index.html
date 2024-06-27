@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>AI Notebook - Infinite Canvas</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #toolbar {
+            padding: 10px;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #toolbar button {
+            margin-right: 10px;
+            padding: 5px 10px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #toolbar button.active {
+            background-color: #e0e0e0;
+        }
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        #drawing-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #debug-console {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 150px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            overflow-y: auto;
+            display: none;
+        }
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+            right: 0;
+        }
+        
+        .dropdown-content a {
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+        }
+        
+        .dropdown-content a:hover {
+            background-color: #f1f1f1;
+        }
+        
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+        #file-drop-zone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #drop-zone-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        #file-select-btn {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <div>
+            <button id="new-session-btn"><i class="fas fa-file"></i> New Page</button>
+            <button id="select-btn"><i class="fas fa-vector-square"></i> Select to Chat</button>
+            <button id="draw-btn" class="active"><i class="fas fa-pencil-alt"></i> </button>
+            <button id="pan-btn"><i class="fas fa-hand-paper"></i> </button>
+            <button id="undo-btn"><i class="fas fa-undo"></i> </button>
+            <button id="redo-btn"><i class="fas fa-redo"></i> </button>
+            <button id="zoom-in-btn"><i class="fas fa-search-plus"></i> </button>
+            <button id="zoom-out-btn"><i class="fas fa-search-minus"></i> </button>
+            <button id="prompt-btn"><i class="fas fa-lightbulb"></i> Prompt Me</button>
+            <button id="about-btn"><i class="fas fa-info-circle"></i></button>
+            <div class="dropdown">
+                <button id="more-options-btn"><i class="fas fa-ellipsis-h"></i></button>
+                <div class="dropdown-content">
+                    <a id="export-btn" href="#"><i class="fas fa-file-export"></i> Export Data</a>
+                    <a id="import-btn" href="#"><i class="fas fa-file-import"></i> Import Data</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="canvas-container">
+        <canvas id="drawing-canvas"></canvas>
+    </div>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+    <div id="info-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div>
+                Write out some words longhand and then click select to highlight the words to send to the Cursive AI. Each session is a conversation where the bot will remember what you discussed. Cursive works best on tablets with a pen.
+            </div>
+        </div>
+    </div>
+    <div id="response-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>AI Response</h2>
+            <div id="response-content"></div>
+        </div>
+    </div>
+    <div id="prompt-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Random Prompt</h2>
+            <p id="prompt-content"></p>
+        </div>
+    </div>
+    <div id="debug-console"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/dataManager.js"></script>
+    <script type="module" src="js/canvasManager.js"></script>
+    <script type="module" src="js/aiService.js"></script>
+    <script type="module" src="js/app.js" defer></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const aboutBtn = document.getElementById('about-btn');
+            const promptBtn = document.getElementById('prompt-btn');
+            const infoModal = document.getElementById('info-modal');
+            const responseModal = document.getElementById('response-modal');
+            const promptModal = document.getElementById('prompt-modal');
+            const closeBtns = document.querySelectorAll('.close');
+
+            
+            const prompts = [
+                "What delightful surprise from your past still makes you smile like finding extra fries at the bottom of the bag?",
+                "If your life were a sitcom, what's a hilarious plot twist from the past that still makes you laugh out loud?",
+                "What past challenge did you tackle that made you feel like you could wrestle a bear and win?",
+                "How can you turn a past failure into a funny story that makes you laugh now, like a blooper reel of your life?",
+                "What small step did you take in the past that felt like a giant leap for mankind (or at least for you), and how can you celebrate that today?",
+                "How can you turn your past quirky actions into a source of strength and humor, like a Mork from Ork costume party?",
+                "What's a laugh you shared in the past that was so contagious, it spread faster than a rumor in a small town?",
+                "If you could go back and give your past self a piece of advice in the form of a stand-up joke, what would it be?",
+                "How can you turn a past challenge into a silver lining that shines brighter than Mork's suspenders?",
+                "What past moment made you laugh so hard you forgot you were supposed to be stressed, like a scene from Mrs. Doubtfire?",
+                "What's a shared moment of hilarity from the past that turned a boring meeting into a stand-up comedy show?",
+                "What's something you took seriously in the past but now laugh about, like a bad haircut or a fashion faux pas?",
+                "What's a challenge from the past that you can now see as a hilarious learning experience, a comedy of errors with a happy ending?",
+                "How can you create a light-hearted moment today that mirrors a cherished memory from the past, like a nostalgic dance party to your favorite 80s jam?",
+                "What's a new opportunity or silver lining you discovered in the past that you can apply to today's challenges, like a hidden superpower?"
+            ];
+            
+            aboutBtn.addEventListener('click', () => {
+                console.log('About button clicked');
+                infoModal.style.display = 'block';
+            });
+
+            promptBtn.addEventListener('click', () => {
+                console.log('Prompt button clicked');
+                const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+                document.getElementById('prompt-content').textContent = randomPrompt;
+                promptModal.style.display = 'block';
+            });
+
+            closeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    console.log('Close button clicked');
+                    const modal = btn.closest('.modal');
+                    if (modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+            });
+
+            window.addEventListener('click', (event) => {
+                if (event.target.classList.contains('modal')) {
+                    console.log('Window click to close modal');
+                    event.target.style.display = 'none';
+                }
+            });
+        });
+    </script>
+    <div id="file-drop-zone" style="display: none;">
+        <div id="drop-zone-content">
+            <p>Drop your JSON file here</p>
+            <p>or</p>
+            <button id="file-select-btn">Select File</button>
+        </div>
+    </div>
+</body>
+</html>
