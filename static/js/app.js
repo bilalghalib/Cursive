@@ -1,4 +1,4 @@
-import { initCanvas, setDrawMode, setSelectMode, setPanMode, clearCanvas, drawTextOnCanvas, clearSelection, redrawCanvas, zoomIn, zoomOut, undo, redo, refreshCanvas, updateDrawings } from './canvasManager.js';
+import { initCanvas, setDrawMode, setSelectMode, setPanMode, setZoomMode, clearCanvas, drawTextOnCanvas, clearSelection, redrawCanvas, zoomIn, zoomOut, undo, redo, refreshCanvas, updateDrawings } from './canvasManager.js';
 import { saveNotebookItem, getAllNotebookItems, exportNotebook, importNotebook, clearNotebook, saveDrawings, getDrawings, getInitialDrawingData, saveToWeb } from './dataManager.js';
 import { sendImageToAI, sendChatToAI } from './aiService.js';
 import { getConfig } from './config.js';
@@ -8,6 +8,7 @@ let currentChatHistory = [];
 let isDebugMode = false;
 let isAppInitialized = false;
 
+let isZoomMode = false;
 
 
 
@@ -69,29 +70,39 @@ function setupEventListeners() {
     const drawBtn = document.getElementById('draw-btn');
     const selectBtn = document.getElementById('select-btn');
     const panBtn = document.getElementById('pan-btn');
-    const zoomInBtn = document.getElementById('zoom-in-btn');
-    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    const zoomBtn = document.getElementById('zoom-btn');
     const newSessionBtn = document.getElementById('new-session-btn');
     const undoBtn = document.getElementById('undo-btn');
     const redoBtn = document.getElementById('redo-btn');
     const exportBtn = document.getElementById('export-btn');
     const importBtn = document.getElementById('import-btn');
     const saveToWebBtn = document.getElementById('save-to-web-btn');
-
+    
     drawBtn.addEventListener('click', () => {
         setDrawMode();
         setActiveButton(drawBtn);
+        isZoomMode = false;
     });
     selectBtn.addEventListener('click', () => {
         setSelectMode();
         setActiveButton(selectBtn);
+        isZoomMode = false;
     });
     panBtn.addEventListener('click', () => {
         setPanMode();
         setActiveButton(panBtn);
+        isZoomMode = false;
     });
-    zoomInBtn.addEventListener('click', zoomIn);
-    zoomOutBtn.addEventListener('click', zoomOut);
+    zoomBtn.addEventListener('click', () => {
+        isZoomMode = !isZoomMode;
+        if (isZoomMode) {
+            setZoomMode();
+            setActiveButton(zoomBtn);
+        } else {
+            setDrawMode();
+            setActiveButton(drawBtn);
+        }
+    });
     undoBtn.addEventListener('click', undo);
     redoBtn.addEventListener('click', redo);
     exportBtn.addEventListener('click', handleExport);
@@ -99,9 +110,19 @@ function setupEventListeners() {
     saveToWebBtn.addEventListener('click', handleSaveToWeb);
     
     newSessionBtn.addEventListener('click', async (e) => {
-        e.preventDefault(); // Prevent default button behavior
+        e.preventDefault();
         await startNewSession();
     });
+    
+    // Prevent default touch actions on the toolbar
+    const toolbar = document.getElementById('toolbar');
+    toolbar.addEventListener('touchstart', preventDefaultTouch, { passive: false });
+    toolbar.addEventListener('touchmove', preventDefaultTouch, { passive: false });
+    toolbar.addEventListener('touchend', preventDefaultTouch, { passive: false });
+}
+
+function preventDefaultTouch(e) {
+    e.preventDefault();
 }
 
 
@@ -396,4 +417,4 @@ window.onerror = function(message, source, lineno, colno, error) {
     debugLog('Error:', message, 'at', source, 'line', lineno);
 };
 
-export { handleImageSelection, handleTranscriptionResponse, displayFullResponse };
+export { handleImageSelection, handleTranscriptionResponse, displayFullResponse, isZoomMode };

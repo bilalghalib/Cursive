@@ -1,5 +1,5 @@
 import { getConfig } from './config.js';
-import { handleImageSelection, displayFullResponse } from './app.js';
+import { handleImageSelection, displayFullResponse, isZoomMode } from './app.js';
 import { getAllNotebookItems, getDrawings, saveDrawings, getInitialDrawingData } from './dataManager.js';
 
 let canvas, ctx;
@@ -7,6 +7,10 @@ let isDrawing = false;
 let isProcessing = false;
 let isPanning = false;
 let lastX = 0, lastY = 0;
+
+let isZooming = false;
+let zoomStartY = 0;
+
 let mode = 'draw';
 let selectionStart = { x: 0, y: 0 };
 let selectionEnd = { x: 0, y: 0 };
@@ -42,6 +46,7 @@ export async function initCanvas() {
         ctx.lineJoin = 'round';
         
         fillCanvasWhite();
+        
         
         canvas.addEventListener('pointerdown', handlePointerDown);
         canvas.addEventListener('pointermove', handlePointerMove);
@@ -100,6 +105,9 @@ function handlePointerDown(e) {
         isPanning = true;
         setPanningCursor();
         [lastX, lastY] = [e.clientX, e.clientY];
+    } else if (mode === 'zoom' && isZoomMode) {
+        isZooming = true;
+        zoomStartY = e.clientY;
     } else if (mode === 'draw' || mode === 'select') {
         isDrawing = true;
         [lastX, lastY] = [x, y];
@@ -114,11 +122,42 @@ function handlePointerDown(e) {
     startRedrawInterval();
 }
 
+function handlePointerMove(e) {
+    e.preventDefault();
+    const { x, y } = getCanvasCoordinates(e);
+    if (isPanning) {
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        panX += dx;
+        panY += dy;
+        [lastX, lastY] = [e.clientX, e.clientY];
+        refreshCanvas();
+    } else if (isZooming && mode === 'zoom' && isZoomMode) {
+        const dy = e.clientY - zoomStartY;
+        if (dy < 0) {
+            zoomIn();
+        } else if (dy > 0) {
+            zoomOut();
+        }
+        zoomStartY = e.clientY;
+    } else if (isDrawing) {
+        if (mode === 'draw') {
+            addPointToStroke(x, y);
+            [lastX, lastY] = [x, y];
+        } else if (mode === 'select') {
+            selectionEnd = { x, y };
+            redrawCanvas();
+        }
+    }
+}
+
 function handlePointerUp(e) {
     e.preventDefault();
     if (isPanning) {
         isPanning = false;
         resetPanningCursor();
+    } else if (isZooming) {
+        isZooming = false;
     } else if (isDrawing) {
         isDrawing = false;
         if (mode === 'select') {
@@ -132,28 +171,8 @@ function handlePointerUp(e) {
     stopRedrawInterval();
     redrawCanvas();
     refreshCanvas();
-}
-
-function handlePointerMove(e) {
-    e.preventDefault();
-    const { x, y } = getCanvasCoordinates(e);
-    if (isPanning) {
-        const dx = e.clientX - lastX;
-        const dy = e.clientY - lastY;
-        panX += dx;
-        panY += dy;
-        [lastX, lastY] = [e.clientX, e.clientY];
-        refreshCanvas();
-    } else if (isDrawing) {
-        if (mode === 'draw') {
-            addPointToStroke(x, y);
-            [lastX, lastY] = [x, y];
-        } else if (mode === 'select') {
-            selectionEnd = { x, y };
-            redrawCanvas(); // Redraw to show the selection rectangle
-        }
     }
-}
+    
 
 
 export function undo() {
@@ -310,28 +329,34 @@ function resetPanningCursor() {
         canvas.style.cursor = 'grab';
     }
 }
-export function zoomIn() {
-    zoom(canvas.width / 2, canvas.height / 2, 1.1);
+    export function setZoomMode() {
+        mode = 'zoom';
+        canvas.style.cursor = 'ns-resize';
+        canvas.classList.remove('pan-mode', 'draw-mode', 'select-mode');
+        canvas.classList.add('zoom-mode');
+    }
     
-}
-
-export function zoomOut() {
-    zoom(canvas.width / 2, canvas.height / 2, 0.9);
-}
-
-function zoom(centerX, centerY, delta) {
-    const pointX = (centerX - panX) / scale;
-    const pointY = (centerY - panY) / scale;
+    export function zoomIn() {
+        zoom(canvas.width / 2, canvas.height / 2, 1.1);
+    }
     
-    scale *= delta;
-    scale = Math.min(Math.max(0.1, scale), 10); // Limit scale between 0.1 and 10
+    export function zoomOut() {
+        zoom(canvas.width / 2, canvas.height / 2, 0.9);
+    }
     
-    panX = centerX - pointX * scale;
-    panY = centerY - pointY * scale;
-    
-    redrawCanvas();
-    refreshCanvas();
-}
+    function zoom(centerX, centerY, delta) {
+        const pointX = (centerX - panX) / scale;
+        const pointY = (centerY - panY) / scale;
+        
+        scale *= delta;
+        scale = Math.min(Math.max(0.1, scale), 10); // Limit scale between 0.1 and 10
+        
+        panX = centerX - pointX * scale;
+        panY = centerY - pointY * scale;
+        
+        redrawCanvas();
+        refreshCanvas();
+    }
 
 function getCanvasCoordinates(e) {
     const rect = canvas.getBoundingClientRect();
@@ -485,5 +510,5 @@ export async function clearNotebook() {
     return { clearedItems: true, clearedDrawings: true };
 }
 
-export { refreshCanvas };
 
+export { refreshCanvas };
