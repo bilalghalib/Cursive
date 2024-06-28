@@ -90,20 +90,21 @@ def save_to_web():
         logging.error(f"Error saving page: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
     
+    
+@app.route('/')
 @app.route('/pages/<page_id>')
-def serve_page(page_id):
+def serve_page(page_id=None):
     try:
-        with open(os.path.join('pages', page_id, 'data.json'), 'r') as f:
-            page_data = json.load(f)
+        if page_id:
+            with open(os.path.join(base_dir, 'pages', page_id, 'data.json'), 'r') as f:
+                page_data = json.load(f)
+        else:
+            page_data = None
             
         return render_template('index.html', page_id=page_id, page_data=page_data)
     except Exception as e:
         logging.error(f"Error serving page {page_id}: {str(e)}")
         return f"Error loading page: {str(e)}", 500
-    
-@app.route('/')
-def serve_index():
-    return render_template('index.html')
 
 # Serve other static files
 @app.route('/<path:path>')

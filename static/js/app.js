@@ -10,25 +10,35 @@ let isAppInitialized = false;
 
 
 
+
 async function initApp() {
     if (isAppInitialized) return;
     
+    showLoading();
+    
     try {
-        showLoading();
-        
         const config = await getConfig();
         if (!config) {
             throw new Error('Configuration not loaded. Cannot initialize app.');
         }
         
-        // Log the loaded configuration (remove in production)
-        console.log('Loaded configuration:', config);
+        await initCanvas();
         
-        await Promise.all([
-            initCanvas(),
-            loadNotebook(),
-            loadInitialDrawings(),
-        ]);
+        if (window.pageData) {
+            // If pageData is available, use it
+            notebookItems = window.pageData.items || [];
+            updateDrawings(window.pageData.drawings || []);
+        } else {
+            // Try loading from local storage
+            try {
+                await loadNotebook();
+                await loadInitialDrawings();
+            } catch (error) {
+                // If loading from local storage fails, try loading initial drawing data
+                console.warn('Error loading notebook from local storage:', error);
+                await loadFallbackInitialDrawings();
+            }
+        }
         
         setupEventListeners();
         setDrawMode();
@@ -39,10 +49,11 @@ async function initApp() {
         console.error('Error initializing app:', error);
         alert(`Error initializing app: ${error.message}\nPlease check the console for more details and refresh the page.`);
     } finally {
-        hideLoading();
+        setTimeout(() => {
+            hideLoading();
+        }, 500);
     }
 }
-
 async function loadInitialDrawings() {
     const drawings = await getDrawings();
     if (drawings.length === 0) {

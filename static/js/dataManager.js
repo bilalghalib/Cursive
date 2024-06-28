@@ -117,7 +117,7 @@ export async function exportNotebook() {
     saveAs(blob, exportFileDefaultName);
 }
 
-export async function importNotebook(file, timeout = 30000) {
+export async function importNotebook(file, config, timeout = 30000) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         
@@ -130,7 +130,7 @@ export async function importNotebook(file, timeout = 30000) {
             clearTimeout(timeoutId);
             try {
                 const importedData = JSON.parse(e.target.result);
-                const STORAGE_KEY = await getStorageKey();
+                const STORAGE_KEY = config.storage.key;
                 
                 if (importedData.items && Array.isArray(importedData.items)) {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData.items));
@@ -153,6 +153,7 @@ export async function importNotebook(file, timeout = 30000) {
         reader.readAsText(file);
     });
 }
+
 
 export async function saveToWeb() {
     try {

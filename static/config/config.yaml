@@ -47,3 +47,6 @@ styles:
   text_color: '#333333'
   font_family: 'Arial, sans-serif'
   
+  export:
+    filename: 'ai_notebook_export.json'
+    
