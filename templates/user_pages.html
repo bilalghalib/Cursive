@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ username }}'s Pages</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .logout {
+            float: right;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ username }}'s Pages</h1>
+    <a href="{{ url_for('logout') }}" class="logout">Logout</a>
+    <ul>
+        {% for page in pages %}
+            <li><a href="{{ url_for('serve_page', username=username, page_id=page.id) }}">{{ page.title }}</a></li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('serve_page', username=username, page_id='new') }}">Create New Page</a>
+</body>
+</html>

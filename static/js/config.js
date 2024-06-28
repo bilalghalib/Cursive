@@ -3,7 +3,7 @@ let configLoaded = false;
 
 async function loadConfig() {
     try {
-        const response = await fetch('config.yaml');
+        const response = await fetch('/config/config.yaml');
         const yamlText = await response.text();
         config = jsyaml.load(yamlText);
         configLoaded = true;
@@ -12,12 +12,29 @@ async function loadConfig() {
     }
 }
 
+// Attempt to load the configuration immediately
+getConfig().catch(error => {
+    console.error('Initial configuration load failed:', error);
+});
+
 // Load the config immediately
 loadConfig();
 
 export async function getConfig() {
-    if (!configLoaded) {
-        await loadConfig();
+    if (config) {
+        return config;
     }
-    return config;
+    
+    try {
+        const response = await fetch('/static/config/config.yaml');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const yamlText = await response.text();
+        config = jsyaml.load(yamlText);
+        return config;
+    } catch (error) {
+        console.error('Failed to load configuration:', error);
+        throw error;
+    }
 }

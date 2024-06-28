@@ -8,10 +8,12 @@
         <meta http-equiv="Expires" content="0">
         <title>AI Notebook - {% if page_id %}{{ page_id }}{% else %}Infinite Canvas{% endif %}</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
-        <link rel="stylesheet" href="css/styles.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+        {% if page_data %}
         <script>
             window.pageData = {{ page_data|tojson|safe }};
         </script>
+        {% endif %}
     </head>
     <body>
         <div id="toolbar">
@@ -39,8 +41,7 @@
         <div id="canvas-container">
             <canvas id="drawing-canvas"></canvas>
         </div>
-    </div>
-    <div id="loading-overlay">
+        <div id="loading-overlay">
         <div class="spinner"></div>
     </div>
     <div id="info-modal" class="modal">
@@ -65,23 +66,26 @@
             <p id="prompt-content"></p>
         </div>
     </div>
-        <div id="save-to-web-modal" class="modal">
-            <div class="modal-content">
-                <h2>Your page has been saved</h2>
-                <p>You can access your saved page at:</p>
-                <p id="save-to-web-url"></p>
-                <button id="copy-url-button">Copy URL</button>
-                <button id="go-to-page-button">Go to Page</button>
-            </div>
+    
+    <div id="save-to-web-modal" class="modal">
+        <div class="modal-content">
+            <h2>Your page has been saved</h2>
+            <p>You can access your saved page at:</p>
+            <p id="save-to-web-url"></p>
+            <button id="copy-url-button">Copy URL</button>
+            <button id="go-to-page-button">Go to Page</button>
         </div>
+    </div>
     <div id="debug-console"></div>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <script type="module" src="js/config.js"></script>
-    <script type="module" src="js/dataManager.js"></script>
-    <script type="module" src="js/canvasManager.js"></script>
-    <script type="module" src="js/aiService.js"></script>
-    <script type="module" src="js/app.js" defer></script>
+    <script type="module" src="{{ url_for('static', filename='js/config.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/dataManager.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/canvasManager.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/aiService.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const aboutBtn = document.getElementById('about-btn');

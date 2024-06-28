@@ -1,14 +1,19 @@
-from flask import Flask, request, jsonify, make_response, send_from_directory
+from flask import Flask, request, jsonify, make_response, send_from_directory, render_template
 from flask_cors import CORS
 import os
 import anthropic
 import logging
+import uuid
+import json
 from dotenv import load_dotenv
-
-# Load environment variables from .env file
 load_dotenv()
 
-app = Flask(__name__, static_folder='static')
+base_dir = os.path.abspath(os.path.dirname(__file__))
+
+app = Flask(__name__, 
+        template_folder=os.path.join(base_dir, 'templates'),
+        static_folder=os.path.join(base_dir, 'static'))
+    
 CORS(app, resources={r"/api/*": {"origins": "http://127.0.0.1:5022"}})
 
 logging.basicConfig(level=logging.DEBUG)
@@ -67,15 +72,48 @@ def build_actual_response(response, status=200):
     response.headers.add("Access-Control-Allow-Origin", "*")
     return response, status
 
-# Serve the static HTML file
+@app.route('/api/save-to-web', methods=['POST'])
+def save_to_web():
+    try:
+        data = request.json
+        page_id = str(uuid.uuid4())[:8]  # Generate a short UUID
+        page_folder = os.path.join('pages', page_id)
+        os.makedirs(page_folder, exist_ok=True)
+        
+        # Save the exported data to a file
+        with open(os.path.join(page_folder, 'data.json'), 'w') as f:
+            json.dump(data, f)
+            
+        page_url = f"{request.url_root}pages/{page_id}"
+        return jsonify({"success": True, "url": page_url})
+    except Exception as e:
+        logging.error(f"Error saving page: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+@app.route('/pages/<page_id>')
+def serve_page(page_id):
+    try:
+        with open(os.path.join('pages', page_id, 'data.json'), 'r') as f:
+            page_data = json.load(f)
+            
+        return render_template('index.html', page_id=page_id, page_data=page_data)
+    except Exception as e:
+        logging.error(f"Error serving page {page_id}: {str(e)}")
+        return f"Error loading page: {str(e)}", 500
+    
 @app.route('/')
 def serve_index():
-    return send_from_directory(app.static_folder, 'index.html')
+    return render_template('index.html')
 
 # Serve other static files
 @app.route('/<path:path>')
 def serve_static_file(path):
     return send_from_directory(app.static_folder, path)
 
+@app.route('/static/config/config.yaml')
+def serve_config():
+    return send_from_directory(os.path.join(base_dir, 'static', 'config'), 'config.yaml')
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5022, debug=True)
+    

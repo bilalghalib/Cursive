@@ -153,3 +153,35 @@ export async function importNotebook(file, timeout = 30000) {
         reader.readAsText(file);
     });
 }
+
+export async function saveToWeb() {
+    try {
+        const items = await getAllNotebookItems();
+        const drawings = await getDrawings();
+        
+        const exportData = { items, drawings };
+        
+        const response = await fetch('/api/save-to-web', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(exportData)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            return result.url;
+        } else {
+            throw new Error(result.error || 'Unknown error occurred');
+        }
+    } catch (error) {
+        console.error('Error saving to web:', error);
+        throw error;
+    }
+}

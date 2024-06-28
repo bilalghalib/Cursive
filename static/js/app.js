@@ -1,5 +1,5 @@
 import { initCanvas, setDrawMode, setSelectMode, setPanMode, clearCanvas, drawTextOnCanvas, clearSelection, redrawCanvas, zoomIn, zoomOut, undo, redo, refreshCanvas, updateDrawings } from './canvasManager.js';
-import { saveNotebookItem, getAllNotebookItems, exportNotebook, importNotebook, clearNotebook, saveDrawings, getDrawings, getInitialDrawingData } from './dataManager.js';
+import { saveNotebookItem, getAllNotebookItems, exportNotebook, importNotebook, clearNotebook, saveDrawings, getDrawings, getInitialDrawingData, saveToWeb } from './dataManager.js';
 import { sendImageToAI, sendChatToAI } from './aiService.js';
 import { getConfig } from './config.js';
 
@@ -7,6 +7,8 @@ let notebookItems = [];
 let currentChatHistory = [];
 let isDebugMode = false;
 let isAppInitialized = false;
+
+
 
 async function initApp() {
     if (isAppInitialized) return;
@@ -18,6 +20,9 @@ async function initApp() {
         if (!config) {
             throw new Error('Configuration not loaded. Cannot initialize app.');
         }
+        
+        // Log the loaded configuration (remove in production)
+        console.log('Loaded configuration:', config);
         
         await Promise.all([
             initCanvas(),
@@ -32,7 +37,7 @@ async function initApp() {
         isAppInitialized = true;
     } catch (error) {
         console.error('Error initializing app:', error);
-        alert('Error initializing app. Please refresh the page.');
+        alert(`Error initializing app: ${error.message}\nPlease check the console for more details and refresh the page.`);
     } finally {
         hideLoading();
     }
@@ -60,7 +65,8 @@ function setupEventListeners() {
     const redoBtn = document.getElementById('redo-btn');
     const exportBtn = document.getElementById('export-btn');
     const importBtn = document.getElementById('import-btn');
-    
+    const saveToWebBtn = document.getElementById('save-to-web-btn');
+
     drawBtn.addEventListener('click', () => {
         setDrawMode();
         setActiveButton(drawBtn);
@@ -75,11 +81,32 @@ function setupEventListeners() {
     });
     zoomInBtn.addEventListener('click', zoomIn);
     zoomOutBtn.addEventListener('click', zoomOut);
-    newSessionBtn.addEventListener('click', startNewSession);
     undoBtn.addEventListener('click', undo);
     redoBtn.addEventListener('click', redo);
     exportBtn.addEventListener('click', handleExport);
     importBtn.addEventListener('click', handleImport);
+    saveToWebBtn.addEventListener('click', handleSaveToWeb);
+    
+    newSessionBtn.addEventListener('click', async (e) => {
+        e.preventDefault(); // Prevent default button behavior
+        await startNewSession();
+    });
+}
+
+
+async function handleSaveToWeb() {
+    try {
+        showLoading();
+        const url = await saveToWeb();
+        hideLoading();
+        
+        // Show a modal with the URL and copy-to-clipboard button
+        showSaveToWebModal(url);
+    } catch (error) {
+        console.error('Error saving to web:', error);
+        hideLoading();
+        alert('Error saving to web. Please try again.');
+    }
 }
 
 function setActiveButton(activeButton) {
@@ -173,6 +200,7 @@ function displayFullResponse(item) {
 }
 
 async function startNewSession() {
+    
     clearCanvas();
     await clearNotebook();
     notebookItems = [];
@@ -181,6 +209,9 @@ async function startNewSession() {
     debugLog('New session started. Canvas, local storage, and chat history cleared.');
     redrawCanvas();
     refreshCanvas();
+    
+    // Change the URL to the root state
+    window.history.pushState({}, '', '/');
 }
 
 function initDebugConsole() {
@@ -309,6 +340,30 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initApp);
 } else {
     initApp();
+}
+
+
+function showSaveToWebModal(url) {
+    const modal = document.getElementById('save-to-web-modal');
+    const urlDisplay = document.getElementById('save-to-web-url');
+    const copyButton = document.getElementById('copy-url-button');
+    const goToPageButton = document.getElementById('go-to-page-button');
+    
+    urlDisplay.textContent = url;
+    modal.style.display = 'block';
+    
+    copyButton.onclick = () => {
+        navigator.clipboard.writeText(url).then(() => {
+            alert('URL copied to clipboard!');
+        }).catch(err => {
+            console.error('Could not copy text: ', err);
+            alert('Failed to copy URL. Please copy it manually.');
+        });
+    };
+    
+    goToPageButton.onclick = () => {
+        window.location.href = url;
+    };
 }
 
 window.addEventListener('pageshow', (event) => {
