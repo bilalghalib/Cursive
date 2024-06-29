@@ -104,9 +104,9 @@ export async function getDrawings() {
 export async function saveDrawings(drawings) {
     localStorage.setItem('drawings', JSON.stringify(drawings));
 }
-
 export async function exportNotebook() {
-    const items = await getAllNotebookItems();
+    const STORAGE_KEY = await getStorageKey();
+    const items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     const drawings = await getDrawings();
     
     const exportData = { items, drawings };
@@ -185,4 +185,13 @@ export async function saveToWeb() {
         console.error('Error saving to web:', error);
         throw error;
     }
+}
+export async function updateDrawings(newDrawings) {
+    drawings = newDrawings;
+    await saveDrawings(drawings);
+    redrawCanvas();
+}
+
+export async function getMostRecentDrawings() {
+    return JSON.parse(localStorage.getItem('drawings') || '[]');
 }

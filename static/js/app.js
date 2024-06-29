@@ -1,5 +1,5 @@
 import { initCanvas, setDrawMode, setSelectMode, setPanMode, setZoomMode, clearCanvas, drawTextOnCanvas, clearSelection, redrawCanvas, zoomIn, zoomOut, undo, redo, refreshCanvas, updateDrawings } from './canvasManager.js';
-import { saveNotebookItem, getAllNotebookItems, exportNotebook, importNotebook, clearNotebook, saveDrawings, getDrawings, getInitialDrawingData, saveToWeb } from './dataManager.js';
+import { saveNotebookItem, getAllNotebookItems, exportNotebook, importNotebook, clearNotebook, saveDrawings, getDrawings, getInitialDrawingData, saveToWeb,getMostRecentDrawings } from './dataManager.js';
 import { sendImageToAI, sendChatToAI } from './aiService.js';
 import { getConfig } from './config.js';
 
@@ -9,8 +9,6 @@ let isDebugMode = false;
 let isAppInitialized = false;
 
 let isZoomMode = false;
-
-
 
 async function initApp() {
     if (isAppInitialized) return;
@@ -25,21 +23,38 @@ async function initApp() {
         
         await initCanvas();
         
+        let drawings = [];
+        
         if (window.pageData) {
             // If pageData is available, use it
             notebookItems = window.pageData.items || [];
-            updateDrawings(window.pageData.drawings || []);
+            drawings = window.pageData.drawings || [];
+            console.log("Loaded data from window.pageData:", { items: notebookItems.length, drawings: drawings.length });
+            
+            // Save the notebook items to localStorage
+            const STORAGE_KEY = config.storage.key;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(notebookItems));
+            
+            // Save the drawings to localStorage
+            await saveDrawings(drawings);
         } else {
-            // Try loading from local storage
-            try {
-                await loadNotebook();
-                await loadInitialDrawings();
-            } catch (error) {
-                // If loading from local storage fails, try loading initial drawing data
-                console.warn('Error loading notebook from local storage:', error);
-                await loadFallbackInitialDrawings();
+            // Load from localStorage if window.pageData is not available
+            drawings = await getMostRecentDrawings();
+            notebookItems = await getAllNotebookItems();
+            
+            // If both window.pageData and localStorage are empty, load initial drawings
+            if (drawings.length === 0) {
+                drawings = await getInitialDrawingData();
+                await saveDrawings(drawings);
             }
+            console.log("Loaded data from localStorage:", { items: notebookItems.length, drawings: drawings.length });
         }
+        
+        // Update the canvas with the loaded drawings
+        await updateDrawings(drawings);
+        
+        // Redraw the canvas to show the loaded items and drawings
+        redrawCanvas();
         
         setupEventListeners();
         setDrawMode();
