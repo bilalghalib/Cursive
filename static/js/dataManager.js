@@ -154,7 +154,6 @@ export async function importNotebook(file, config, timeout = 30000) {
     });
 }
 
-
 export async function saveToWeb() {
     try {
         const items = await getAllNotebookItems();
@@ -177,6 +176,9 @@ export async function saveToWeb() {
         const result = await response.json();
         
         if (result.success) {
+            // Update local storage after successful save
+            await saveDrawings(drawings);
+            await batchUpdateNotebookItems(items);
             return result.url;
         } else {
             throw new Error(result.error || 'Unknown error occurred');

@@ -1,4 +1,4 @@
-import { initCanvas, setDrawMode, setSelectMode, setPanMode, setZoomMode, clearCanvas, drawTextOnCanvas, clearSelection, redrawCanvas, zoomIn, zoomOut, undo, redo, refreshCanvas, updateDrawings } from './canvasManager.js';
+import CanvasManager from './canvasManager.js';
 import { saveNotebookItem, getAllNotebookItems, exportNotebook, importNotebook, clearNotebook, saveDrawings, getDrawings, getInitialDrawingData, saveToWeb } from './dataManager.js';
 import { sendImageToAI, sendChatToAI } from './aiService.js';
 import { getConfig } from './config.js';
@@ -7,10 +7,7 @@ let notebookItems = [];
 let currentChatHistory = [];
 let isDebugMode = false;
 let isAppInitialized = false;
-
-let isZoomMode = false;
-
-
+let canvasManager;
 
 async function initApp() {
     if (isAppInitialized) return;
@@ -23,26 +20,24 @@ async function initApp() {
             throw new Error('Configuration not loaded. Cannot initialize app.');
         }
         
-        await initCanvas();
+        canvasManager = new CanvasManager();
+        await canvasManager.init();
         
         if (window.pageData) {
             // If pageData is available, use it
             notebookItems = window.pageData.items || [];
-            updateDrawings(window.pageData.drawings || []);
+            canvasManager.drawingEngine.setDrawings(window.pageData.drawings || []);
         } else {
-            // Try loading from local storage
-            try {
-                await loadNotebook();
-                await loadInitialDrawings();
-            } catch (error) {
-                // If loading from local storage fails, try loading initial drawing data
-                console.warn('Error loading notebook from local storage:', error);
-                await loadFallbackInitialDrawings();
-            }
+            // Load from local storage
+            await loadNotebook();
+            await loadInitialDrawings();
         }
         
+        // Set notebook items in CanvasManager
+        canvasManager.setNotebookItems(notebookItems);
+        
         setupEventListeners();
-        setDrawMode();
+        canvasManager.setMode('draw');
         initDebugConsole();
         
         isAppInitialized = true;
@@ -50,21 +45,22 @@ async function initApp() {
         console.error('Error initializing app:', error);
         alert(`Error initializing app: ${error.message}\nPlease check the console for more details and refresh the page.`);
     } finally {
-        setTimeout(() => {
-            hideLoading();
-        }, 500);
+        hideLoading();
     }
 }
+
 async function loadInitialDrawings() {
     const drawings = await getDrawings();
     if (drawings.length === 0) {
         const initialDrawings = await getInitialDrawingData();
         await saveDrawings(initialDrawings);
-        updateDrawings(initialDrawings);
+        canvasManager.drawingEngine.setDrawings(initialDrawings);
     } else {
-        updateDrawings(drawings);
+        canvasManager.drawingEngine.setDrawings(drawings);
     }
+    canvasManager.drawingEngine.redrawCanvas();
 }
+
 
 function setupEventListeners() {
     const drawBtn = document.getElementById('draw-btn');
@@ -79,36 +75,28 @@ function setupEventListeners() {
     const saveToWebBtn = document.getElementById('save-to-web-btn');
     
     drawBtn.addEventListener('click', () => {
-        setDrawMode();
+        canvasManager.setMode('draw');
         setActiveButton(drawBtn);
-        isZoomMode = false;
     });
     selectBtn.addEventListener('click', () => {
-        setSelectMode();
+        canvasManager.setMode('select');
         setActiveButton(selectBtn);
-        isZoomMode = false;
     });
     panBtn.addEventListener('click', () => {
-        setPanMode();
+        canvasManager.setMode('pan');
         setActiveButton(panBtn);
-        isZoomMode = false;
     });
     zoomBtn.addEventListener('click', () => {
-        isZoomMode = !isZoomMode;
-        if (isZoomMode) {
-            setZoomMode();
-            setActiveButton(zoomBtn);
-        } else {
-            setDrawMode();
-            setActiveButton(drawBtn);
-        }
+        canvasManager.setMode('zoom');
+        setActiveButton(zoomBtn);
     });
-    undoBtn.addEventListener('click', undo);
-    redoBtn.addEventListener('click', redo);
+    undoBtn.addEventListener('click', () => canvasManager.undo());
+    redoBtn.addEventListener('click', () => canvasManager.redo());
     exportBtn.addEventListener('click', handleExport);
     importBtn.addEventListener('click', handleImport);
     saveToWebBtn.addEventListener('click', handleSaveToWeb);
-    
+    canvasManager.canvas.addEventListener('pointerup', handleCanvasPointerUp);
+
     newSessionBtn.addEventListener('click', async (e) => {
         e.preventDefault();
         await startNewSession();
@@ -145,11 +133,22 @@ function hideLoading() {
     document.getElementById('loading-overlay').style.display = 'none';
 }
 
+
+async function handleCanvasPointerUp(e) {
+    if (canvasManager.mode === 'select') {
+        const selection = canvasManager.captureSelection();
+        if (selection) {
+            await handleImageSelection(selection);
+        }
+    }
+}
+
+
 async function handleImageSelection(selectionData) {
     try {
         showLoading();
         debugLog('Sending image to AI...', selectionData);
-        const aiResponse = await sendImageToAI(selectionData.imageData);
+        const aiResponse = await sendImageToAI(selectionData.dataURL);
         debugLog('AI Response received:', aiResponse);
         
         const transcription = aiResponse.transcription;
@@ -173,16 +172,17 @@ async function handleImageSelection(selectionData) {
         
         debugLog('Notebook item saved and displayed');
         
-        setDrawMode();
-        setActiveButton(document.getElementById('draw-btn'));
+        // Update CanvasManager with new notebook items
+        canvasManager.setNotebookItems(notebookItems);
         
-        redrawCanvas();
+        canvasManager.setMode('draw');
+        setActiveButton(document.getElementById('draw-btn'));
     } catch (error) {
         console.error('Error handling image selection:', error);
         console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
         alert(`Error processing image: ${error.message}. Please try again.`);
         
-        setDrawMode();
+        canvasManager.setMode('draw');
         setActiveButton(document.getElementById('draw-btn'));
     } finally {
         hideLoading();
@@ -206,7 +206,7 @@ async function handleTranscriptionResponse(transcription) {
 
 async function loadNotebook() {
     notebookItems = await getAllNotebookItems();
-    redrawCanvas();
+    canvasManager.setNotebookItems(notebookItems);
 }
 
 function displayFullResponse(item) {
@@ -221,21 +221,19 @@ function displayFullResponse(item) {
     modal.style.display = 'block';
 }
 
+
 async function startNewSession() {
-    
-    clearCanvas();
+    canvasManager.clearCanvas();
     await clearNotebook();
     notebookItems = [];
     currentChatHistory = [];
     await saveDrawings([]);
     debugLog('New session started. Canvas, local storage, and chat history cleared.');
-    redrawCanvas();
-    refreshCanvas();
+    canvasManager.drawingEngine.redrawCanvas();
     
     // Change the URL to the root state
     window.history.pushState({}, '', '/');
 }
-
 function initDebugConsole() {
     const debugConsole = document.getElementById('debug-console');
     if (debugConsole) {
@@ -407,4 +405,4 @@ window.onerror = function(message, source, lineno, colno, error) {
     debugLog('Error:', message, 'at', source, 'line', lineno);
 };
 
-export { handleImageSelection, handleTranscriptionResponse, displayFullResponse, isZoomMode };
+export { handleImageSelection, handleTranscriptionResponse, displayFullResponse };
