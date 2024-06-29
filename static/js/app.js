@@ -113,16 +113,6 @@ function setupEventListeners() {
         e.preventDefault();
         await startNewSession();
     });
-    
-    // Prevent default touch actions on the toolbar
-    const toolbar = document.getElementById('toolbar');
-    toolbar.addEventListener('touchstart', preventDefaultTouch, { passive: false });
-    toolbar.addEventListener('touchmove', preventDefaultTouch, { passive: false });
-    toolbar.addEventListener('touchend', preventDefaultTouch, { passive: false });
-}
-
-function preventDefaultTouch(e) {
-    e.preventDefault();
 }
 
 

@@ -186,8 +186,10 @@ html, body {
 -webkit-touch-callout: none;
 -webkit-text-size-adjust: none;
 -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-touch-action: none; /* Prevent all touch actions */
 }
-#toolbar {
-touch-action: none; /* Prevent touch actions on toolbar */
+#drawing-canvas {
+touch-action: none;
+}
+#toolbar button {
+touch-action: manipulation;
 }

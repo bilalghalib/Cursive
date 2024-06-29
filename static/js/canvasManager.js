@@ -29,6 +29,8 @@ const REDRAW_INTERVAL = 50; // Redraw every 50ms
 let undoStack = [];
 let redoStack = [];
 
+let touchIdentifier = null;
+
 export async function initCanvas() {
     try {
         const config = await getConfig();
@@ -47,20 +49,16 @@ export async function initCanvas() {
         
         fillCanvasWhite();
         
-        
         canvas.addEventListener('pointerdown', handlePointerDown);
         canvas.addEventListener('pointermove', handlePointerMove);
         canvas.addEventListener('pointerup', handlePointerUp);
         canvas.addEventListener('pointerout', handlePointerUp);
         
-        canvas.addEventListener('touchstart', preventDefaultTouch, { passive: false });
-        canvas.addEventListener('touchmove', preventDefaultTouch, { passive: false });
-        canvas.addEventListener('touchend', preventDefaultTouch, { passive: false });
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
         
         canvas.style.touchAction = 'none';
-        canvas.style.userSelect = 'none';
-        canvas.style.webkitUserSelect = 'none';
-        canvas.style.msUserSelect = 'none';
         
         window.addEventListener('resize', resizeCanvas);
         
@@ -84,22 +82,38 @@ export async function initCanvas() {
     }
 }
 
-function startRedrawInterval() {
-    stopRedrawInterval();
-    redrawInterval = setInterval(redrawCanvas, REDRAW_INTERVAL);
-}
-function stopRedrawInterval() {
-    if (redrawInterval) clearInterval(redrawInterval);
-}
-
-function preventDefaultTouch(e) {
+function handleTouchStart(e) {
     e.preventDefault();
+    if (e.touches.length === 1 && touchIdentifier === null) {
+        touchIdentifier = e.touches[0].identifier;
+        handlePointerDown(e.touches[0]);
+    }
 }
 
+function handleTouchMove(e) {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+        for (let i = 0; i < e.touches.length; i++) {
+            if (e.touches[i].identifier === touchIdentifier) {
+                handlePointerMove(e.touches[i]);
+                break;
+            }
+        }
+    }
+}
 
+function handleTouchEnd(e) {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === touchIdentifier) {
+            handlePointerUp(e.changedTouches[i]);
+            touchIdentifier = null;
+            break;
+        }
+    }
+}
 
 function handlePointerDown(e) {
-    e.preventDefault();
     const { x, y } = getCanvasCoordinates(e);
     if (mode === 'pan') {
         isPanning = true;
@@ -123,7 +137,6 @@ function handlePointerDown(e) {
 }
 
 function handlePointerMove(e) {
-    e.preventDefault();
     const { x, y } = getCanvasCoordinates(e);
     if (isPanning) {
         const dx = e.clientX - lastX;
@@ -152,7 +165,6 @@ function handlePointerMove(e) {
 }
 
 function handlePointerUp(e) {
-    e.preventDefault();
     if (isPanning) {
         isPanning = false;
         resetPanningCursor();
@@ -171,9 +183,16 @@ function handlePointerUp(e) {
     stopRedrawInterval();
     redrawCanvas();
     refreshCanvas();
-    }
-    
+}
 
+function startRedrawInterval() {
+    stopRedrawInterval();
+    redrawInterval = setInterval(redrawCanvas, REDRAW_INTERVAL);
+}
+
+function stopRedrawInterval() {
+    if (redrawInterval) clearInterval(redrawInterval);
+}
 
 export function undo() {
     if (undoStack.length > 1) { // Keep at least one state (the initial empty state)
@@ -201,8 +220,6 @@ function refreshCanvas() {
     redrawNotebookItems();
 }
 
-
-
 function addPointToStroke(x, y) {
     currentStroke.push({ x, y });
 }
@@ -214,7 +231,6 @@ function addDrawingAction(stroke) {
     drawings = newDrawings;
     saveDrawings(drawings);
 }
-
 
 function drawStoredDrawings() {
     ctx.save();
@@ -300,22 +316,29 @@ function resizeCanvas() {
 export function setDrawMode() {
     mode = 'draw';
     canvas.style.cursor = 'auto';
-    canvas.classList.remove('pan-mode', 'select-mode');
+    canvas.classList.remove('pan-mode', 'select-mode', 'zoom-mode');
     canvas.classList.add('draw-mode');
 }
 
 export function setSelectMode() {
     mode = 'select';
     canvas.style.cursor = 'crosshair';
-    canvas.classList.remove('pan-mode', 'draw-mode');
+    canvas.classList.remove('pan-mode', 'draw-mode', 'zoom-mode');
     canvas.classList.add('select-mode');
 }
 
 export function setPanMode() {
     mode = 'pan';
     canvas.style.cursor = 'grab';
-    canvas.classList.remove('draw-mode', 'select-mode');
+    canvas.classList.remove('draw-mode', 'select-mode', 'zoom-mode');
     canvas.classList.add('pan-mode');
+}
+
+export function setZoomMode() {
+    mode = 'zoom';
+    canvas.style.cursor = 'ns-resize';
+    canvas.classList.remove('pan-mode', 'draw-mode', 'select-mode');
+    canvas.classList.add('zoom-mode');
 }
 
 function setPanningCursor() {
@@ -329,34 +352,28 @@ function resetPanningCursor() {
         canvas.style.cursor = 'grab';
     }
 }
-    export function setZoomMode() {
-        mode = 'zoom';
-        canvas.style.cursor = 'ns-resize';
-        canvas.classList.remove('pan-mode', 'draw-mode', 'select-mode');
-        canvas.classList.add('zoom-mode');
-    }
+
+export function zoomIn() {
+    zoom(canvas.width / 2, canvas.height / 2, 1.1);
+}
+
+export function zoomOut() {
+    zoom(canvas.width / 2, canvas.height / 2, 0.9);
+}
+
+function zoom(centerX, centerY, delta) {
+    const pointX = (centerX - panX) / scale;
+    const pointY = (centerY - panY) / scale;
     
-    export function zoomIn() {
-        zoom(canvas.width / 2, canvas.height / 2, 1.1);
-    }
+    scale *= delta;
+    scale = Math.min(Math.max(0.1, scale), 10); // Limit scale between 0.1 and 10
     
-    export function zoomOut() {
-        zoom(canvas.width / 2, canvas.height / 2, 0.9);
-    }
+    panX = centerX - pointX * scale;
+    panY = centerY - pointY * scale;
     
-    function zoom(centerX, centerY, delta) {
-        const pointX = (centerX - panX) / scale;
-        const pointY = (centerY - panY) / scale;
-        
-        scale *= delta;
-        scale = Math.min(Math.max(0.1, scale), 10); // Limit scale between 0.1 and 10
-        
-        panX = centerX - pointX * scale;
-        panY = centerY - pointY * scale;
-        
-        redrawCanvas();
-        refreshCanvas();
-    }
+    redrawCanvas();
+    refreshCanvas();
+}
 
 function getCanvasCoordinates(e) {
     const rect = canvas.getBoundingClientRect();

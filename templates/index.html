@@ -1,30 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>AI Notebook - {% if page_id %}{{ page_id }}{% else %}Infinite Canvas{% endif %}</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    {% if page_data %}
-    <script>
-        window.pageData = {{ page_data|tojson|safe }};
-    </script>
-    {% endif %}
-    <style>
-        html, body {
-            -webkit-touch-callout: none; /* Prevent callout to copy image, etc. */
-            -webkit-text-size-adjust: none; /* Prevent webkit from resizing text to fit */
-            -webkit-tap-highlight-color: rgba(0, 0, 0, 0); /* Prevent tap highlight */
-            touch-action: manipulation; /* Prevent double-tap to zoom */
-        }
-    </style>
-</head>
-<body>
-    <div id="toolbar">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
+        <title>AI Notebook - {% if page_id %}{{ page_id }}{% else %}Infinite Canvas{% endif %}</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+        {% if page_data %}
+        <script>
+            window.pageData = {{ page_data|tojson|safe }};
+        </script>
+        {% endif %}
+    </head>
+    <body>
+        <div id="toolbar">
         <div>
             <button id="new-session-btn"><i class="fas fa-file"></i> New Page</button>
             <button id="select-btn"><i class="fas fa-vector-square"></i> Select to Chat</button>
