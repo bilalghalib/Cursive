@@ -4,3 +4,4 @@ static/.DS_Store
 .env
 /pages
 /pages
+.DS_Store
