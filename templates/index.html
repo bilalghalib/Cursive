@@ -8,6 +8,7 @@
         <meta http-equiv="Expires" content="0">
         <title>AI Notebook - {% if page_id %}{{ page_id }}{% else %}Infinite Canvas{% endif %}</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Caveat&family=Indie+Flower&family=Dancing+Script&display=swap">
         <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
         {% if page_data %}
         <script>
@@ -57,6 +58,28 @@
     </div>
     <div id="canvas-container">
         <canvas id="drawing-canvas"></canvas>
+        <div id="text-overlays"></div>
+        
+        <!-- Direct Handwriting Chat Button -->
+        <div id="direct-chat-button" title="Write a prompt directly">
+            <i class="fas fa-comment-alt"></i>
+            <span>Chat</span>
+        </div>
+        
+        <!-- Write Prompt Panel -->
+        <div id="write-prompt-panel" class="hidden">
+            <div class="panel-header">
+                <h3>Write your prompt</h3>
+                <button id="close-prompt-panel" class="close-panel-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-content">
+                <canvas id="prompt-canvas"></canvas>
+                <div class="prompt-controls">
+                    <button id="clear-prompt-btn" title="Clear"><i class="fas fa-eraser"></i></button>
+                    <button id="submit-prompt-btn" title="Send to Claude"><i class="fas fa-paper-plane"></i> Send</button>
+                </div>
+            </div>
+        </div>
     </div>
     <div id="loading-overlay">
         <div class="spinner"></div>
@@ -74,6 +97,7 @@
             <div class="modal-header">
                 <h2>Chat with Claude</h2>
                 <div class="modal-actions">
+                    <button id="etch-to-canvas-btn" title="Add to canvas as handwriting"><i class="fas fa-edit"></i> Etch to Canvas</button>
                     <button id="continue-chat-btn" title="Continue this conversation"><i class="fas fa-comment"></i> Continue</button>
                     <button id="new-prompt-btn" title="Start new prompt"><i class="fas fa-plus"></i> New</button>
                     <span class="close" title="Close">&times;</span>
@@ -81,7 +105,15 @@
             </div>
             <div id="response-content"></div>
             <div class="chat-input-container">
+                <div class="input-options">
+                    <button id="type-text-btn" class="input-option-btn active" title="Type text"><i class="fas fa-keyboard"></i></button>
+                    <button id="draw-text-btn" class="input-option-btn" title="Draw response"><i class="fas fa-pen"></i></button>
+                </div>
                 <textarea id="chat-input" placeholder="Ask a follow-up question..." rows="2"></textarea>
+                <div id="chat-drawing-container" class="hidden">
+                    <canvas id="chat-drawing-canvas"></canvas>
+                    <button id="clear-drawing-btn" title="Clear"><i class="fas fa-eraser"></i></button>
+                </div>
                 <button id="send-chat-btn"><i class="fas fa-paper-plane"></i></button>
             </div>
         </div>

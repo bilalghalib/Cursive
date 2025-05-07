@@ -23,6 +23,9 @@ let panY = 0;
 let drawings = [];
 let currentStroke = [];
 
+// Store default line properties to prevent accumulating changes
+let defaultLineWidth = 2;
+
 // Using requestAnimationFrame instead of interval for smoother rendering
 
 let undoStack = [];
@@ -41,8 +44,10 @@ export async function initCanvas() {
         
         resizeCanvas();
         
+        // Store and set default drawing properties
         ctx.strokeStyle = config.canvas.line_color;
-        ctx.lineWidth = config.canvas.line_width;
+        defaultLineWidth = config.canvas.line_width || 2;
+        ctx.lineWidth = defaultLineWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
@@ -275,6 +280,9 @@ function handlePointerUp(e) {
             if (currentStroke.length > 1) {
                 addDrawingAction(currentStroke);
             }
+            
+            // Reset line width to default after each stroke to prevent accumulation
+            ctx.lineWidth = defaultLineWidth;
         }
     }
     stopRedrawInterval();
@@ -346,8 +354,8 @@ function drawStoredDrawings() {
     ctx.save();
     ctx.setTransform(scale, 0, 0, scale, panX, panY);
     
-    // Default line width from config
-    const defaultLineWidth = ctx.lineWidth;
+    // Use the stored default line width
+    const baseLineWidth = defaultLineWidth;
     
     drawings.forEach(stroke => {
         if (stroke.length > 1) {
@@ -368,9 +376,9 @@ function drawStoredDrawings() {
                     const prevPressure = prevPoint.pressure || 1.0;
                     const currPressure = currPoint.pressure || 1.0;
                     
-                    // Adjust line width based on pressure
-                    const prevWidth = defaultLineWidth * (0.5 + prevPressure * 1.5);
-                    const currWidth = defaultLineWidth * (0.5 + currPressure * 1.5);
+                    // Adjust line width based on pressure - using consistent base width
+                    const prevWidth = baseLineWidth * (0.5 + prevPressure * 1.5);
+                    const currWidth = baseLineWidth * (0.5 + currPressure * 1.5);
                     
                     // Special case for variable width drawing through custom path
                     if (Math.abs(prevWidth - currWidth) > 0.1) {
@@ -405,7 +413,7 @@ function drawStoredDrawings() {
     });
     
     // Reset line width
-    ctx.lineWidth = defaultLineWidth;
+    ctx.lineWidth = baseLineWidth;
     ctx.restore();
 }
 
@@ -414,8 +422,8 @@ function drawCurrentStroke() {
         ctx.save();
         ctx.setTransform(scale, 0, 0, scale, panX, panY);
         
-        // Default line width from config
-        const defaultLineWidth = ctx.lineWidth;
+        // Use the stored default line width
+        const baseLineWidth = defaultLineWidth;
         
         // Use a smoother curve algorithm for better writing
         ctx.beginPath();
@@ -430,9 +438,9 @@ function drawCurrentStroke() {
             const prevPressure = prevPoint.pressure || 1.0;
             const currPressure = currPoint.pressure || 1.0;
             
-            // Adjust line width based on pressure
-            const prevWidth = defaultLineWidth * (0.5 + prevPressure * 1.5);
-            const currWidth = defaultLineWidth * (0.5 + currPressure * 1.5);
+            // Adjust line width based on pressure - using consistent base width
+            const prevWidth = baseLineWidth * (0.5 + prevPressure * 1.5);
+            const currWidth = baseLineWidth * (0.5 + currPressure * 1.5);
             
             // Special case for variable width drawing
             if (Math.abs(prevWidth - currWidth) > 0.1) {
@@ -453,8 +461,8 @@ function drawCurrentStroke() {
             ctx.moveTo(currPoint.x, currPoint.y);
         }
         
-        // Reset line width
-        ctx.lineWidth = defaultLineWidth;
+        // Reset line width to the original default to prevent accumulation
+        ctx.lineWidth = baseLineWidth;
         ctx.restore();
     }
 }
@@ -484,12 +492,80 @@ function drawSelectionRect() {
     
     ctx.save();
     ctx.setTransform(scale, 0, 0, scale, panX, panY);
-    ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; // Translucent yellow
+    
+    // Create a more visually appealing selection with primary color
+    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+    
+    // Use theme-appropriate selection colors
+    const fillColor = isDarkMode ? 
+        'rgba(75, 171, 247, 0.2)' : 
+        'rgba(0, 123, 255, 0.2)';
+        
+    const strokeColor = isDarkMode ? 
+        'rgba(75, 171, 247, 0.8)' : 
+        'rgba(0, 123, 255, 0.8)';
+    
+    // Fill with translucent color
+    ctx.fillStyle = fillColor;
     ctx.fillRect(selectionStart.x, selectionStart.y, width, height);
-    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // More opaque yellow for the border
+    
+    // Draw dashed border for better visibility
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 2 / scale;
+    ctx.setLineDash([6 / scale, 3 / scale]); // Create dashed line effect
     ctx.strokeRect(selectionStart.x, selectionStart.y, width, height);
+    
+    // Draw sizing handles at the corners
+    const handleSize = 8 / scale;
+    ctx.fillStyle = strokeColor;
+    
+    // Top-left handle
+    ctx.fillRect(selectionStart.x - handleSize/2, selectionStart.y - handleSize/2, handleSize, handleSize);
+    
+    // Top-right handle
+    ctx.fillRect(selectionStart.x + width - handleSize/2, selectionStart.y - handleSize/2, handleSize, handleSize);
+    
+    // Bottom-left handle
+    ctx.fillRect(selectionStart.x - handleSize/2, selectionStart.y + height - handleSize/2, handleSize, handleSize);
+    
+    // Bottom-right handle
+    ctx.fillRect(selectionStart.x + width - handleSize/2, selectionStart.y + height - handleSize/2, handleSize, handleSize);
+    
+    // Reset line dash and restore context
+    ctx.setLineDash([]);
     ctx.restore();
+    
+    // Add magnifier icon in the middle if selection is large enough
+    if (Math.abs(width) > 50 / scale && Math.abs(height) > 50 / scale) {
+        const centerX = selectionStart.x + width / 2;
+        const centerY = selectionStart.y + height / 2;
+        
+        ctx.save();
+        ctx.setTransform(scale, 0, 0, scale, panX, panY);
+        
+        // Draw chat icon
+        const iconSize = Math.min(Math.abs(width), Math.abs(height)) * 0.2;
+        if (iconSize > 10 / scale) {
+            // Semi-transparent background circle
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, iconSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw simplified chat icon
+            ctx.fillStyle = strokeColor;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, iconSize * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, iconSize * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    }
 }
 
 // Renamed to better reflect its purpose across themes
@@ -651,27 +727,51 @@ async function handleSelection() {
     const height = Math.abs(selectionEnd.y - selectionStart.y);
     
     // Only process if selection has reasonable size
-    if (width > 5 && height > 5) {
+    if (width > 20 && height > 20) { // Increased size threshold for better detection
         // Add visual feedback during processing
         const x = Math.min(selectionStart.x, selectionEnd.x);
         const y = Math.min(selectionStart.y, selectionEnd.y);
         
+        // Get theme-appropriate colors
+        const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+        const primaryColor = isDarkMode ? 
+            'rgba(75, 171, 247, 0.8)' : 
+            'rgba(0, 123, 255, 0.8)';
+        const successColor = isDarkMode ?
+            'rgba(40, 180, 100, 0.8)' :
+            'rgba(40, 180, 100, 0.8)';
+        const errorColor = isDarkMode ?
+            'rgba(220, 50, 50, 0.8)' :
+            'rgba(220, 50, 50, 0.8)';
+        
         // Highlight the selection with a pulse animation
         let pulseCounter = 0;
-        const maxPulses = 3;
+        const maxPulses = 5; // More pulses for a smoother animation
         const pulseInterval = setInterval(() => {
             ctx.save();
             ctx.setTransform(scale, 0, 0, scale, panX, panY);
             
             // Draw a pulsing highlight rectangle
-            const alpha = 0.2 + 0.3 * Math.sin(pulseCounter * 0.5);
+            const pulse = Math.sin(pulseCounter * 0.3);
+            const alpha = 0.2 + 0.4 * Math.abs(pulse);
+            const expandFactor = 1 + 0.05 * pulse;
+            
+            // Calculate expanded selection for pulse effect
+            const expandedWidth = width * expandFactor;
+            const expandedHeight = height * expandFactor;
+            const expandedX = x - (expandedWidth - width) / 2;
+            const expandedY = y - (expandedHeight - height) / 2;
+            
+            // Draw expanded highlight
             ctx.fillStyle = `rgba(100, 150, 255, ${alpha})`;
-            ctx.fillRect(x, y, width, height);
+            ctx.fillRect(expandedX, expandedY, expandedWidth, expandedHeight);
             
             // Draw selection border
-            ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+            ctx.strokeStyle = primaryColor;
             ctx.lineWidth = 2 / scale;
-            ctx.strokeRect(x, y, width, height);
+            ctx.setLineDash([8 / scale, 4 / scale]);
+            ctx.strokeRect(expandedX, expandedY, expandedWidth, expandedHeight);
+            ctx.setLineDash([]);
             
             pulseCounter++;
             if (pulseCounter >= maxPulses * Math.PI * 2) {
@@ -679,7 +779,7 @@ async function handleSelection() {
             }
             
             ctx.restore();
-        }, 50);
+        }, 33); // Faster for smoother animation (30fps)
         
         // Create a temporary canvas for the selection
         const selectionCanvas = document.createElement('canvas');
@@ -704,20 +804,20 @@ async function handleSelection() {
         };
         
         try {
-            // Show a small overlay indicating the selection is being processed
+            // Create a more informative processing indicator
             const selectionOverlay = document.createElement('div');
             selectionOverlay.className = 'selection-processing';
             selectionOverlay.innerHTML = `<div class="selection-indicator">
                 <i class="fas fa-brain"></i> 
-                <span>Processing selection...</span>
+                <span>Converting handwriting to text...</span>
             </div>`;
             document.body.appendChild(selectionOverlay);
             
             // Position the overlay near the selection
-            const viewportX = x * scale + panX;
-            const viewportY = y * scale + panY;
-            selectionOverlay.style.left = `${viewportX + width * scale / 2}px`;
-            selectionOverlay.style.top = `${viewportY + height * scale + 20}px`;
+            const viewportX = x * scale + panX + (width * scale / 2);
+            const viewportY = y * scale + panY + (height * scale / 2);
+            selectionOverlay.style.left = `${viewportX}px`;
+            selectionOverlay.style.top = `${viewportY}px`;
             
             try {
                 // Process the selection
@@ -726,58 +826,209 @@ async function handleSelection() {
                 // Clear the pulse animation
                 clearInterval(pulseInterval);
                 
-                // Draw a success indicator
-                ctx.save();
-                ctx.setTransform(scale, 0, 0, scale, panX, panY);
-                ctx.strokeStyle = 'rgba(40, 180, 100, 0.8)';
-                ctx.lineWidth = 2 / scale;
-                ctx.strokeRect(x, y, width, height);
-                ctx.restore();
+                // Draw a success indicator with animation
+                const successFrames = 30;
+                let frameCount = 0;
+                
+                const successAnimation = setInterval(() => {
+                    ctx.save();
+                    ctx.setTransform(scale, 0, 0, scale, panX, panY);
+                    
+                    // Draw expanding success rectangle
+                    const progress = frameCount / successFrames;
+                    const expandSize = progress * 20 / scale;
+                    
+                    ctx.strokeStyle = successColor;
+                    ctx.lineWidth = 3 / scale;
+                    ctx.strokeRect(
+                        x - expandSize, 
+                        y - expandSize, 
+                        width + expandSize * 2, 
+                        height + expandSize * 2
+                    );
+                    
+                    // Fade out as it expands
+                    if (frameCount >= successFrames / 2) {
+                        // Draw checkmark in center of selection
+                        const centerX = x + width / 2;
+                        const centerY = y + height / 2;
+                        const checkSize = 20 / scale;
+                        
+                        ctx.lineWidth = 4 / scale;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        
+                        // Draw circle
+                        ctx.beginPath();
+                        ctx.arc(centerX, centerY, checkSize, 0, Math.PI * 2);
+                        ctx.stroke();
+                        
+                        // Draw checkmark
+                        ctx.beginPath();
+                        ctx.moveTo(centerX - checkSize/2, centerY);
+                        ctx.lineTo(centerX - checkSize/5, centerY + checkSize/2);
+                        ctx.lineTo(centerX + checkSize/2, centerY - checkSize/3);
+                        ctx.stroke();
+                    }
+                    
+                    frameCount++;
+                    if (frameCount >= successFrames) {
+                        clearInterval(successAnimation);
+                    }
+                    
+                    ctx.restore();
+                }, 16);
+                
             } catch (error) {
                 console.error('Error handling image selection:', error);
                 
-                // Show error indicator on the canvas
-                ctx.save();
-                ctx.setTransform(scale, 0, 0, scale, panX, panY);
-                ctx.strokeStyle = 'rgba(220, 50, 50, 0.8)';
-                ctx.lineWidth = 2 / scale;
-                ctx.strokeRect(x, y, width, height);
-                ctx.restore();
+                // Clear the pulse animation
+                clearInterval(pulseInterval);
                 
-                alert('Error processing selection. Please try again.');
+                // Show error indicator animation
+                const errorFrames = 20;
+                let errorFrame = 0;
+                
+                const errorAnimation = setInterval(() => {
+                    ctx.save();
+                    ctx.setTransform(scale, 0, 0, scale, panX, panY);
+                    
+                    // Shake effect
+                    const shakeAmount = 3 / scale;
+                    const offsetX = Math.sin(errorFrame * 0.8) * shakeAmount;
+                    
+                    ctx.strokeStyle = errorColor;
+                    ctx.lineWidth = 3 / scale;
+                    ctx.strokeRect(x + offsetX, y, width, height);
+                    
+                    // Draw X mark
+                    if (errorFrame > 5) {
+                        const centerX = x + width / 2;
+                        const centerY = y + height / 2;
+                        const xSize = 15 / scale;
+                        
+                        ctx.lineWidth = 4 / scale;
+                        ctx.lineCap = 'round';
+                        
+                        // X mark
+                        ctx.beginPath();
+                        ctx.moveTo(centerX - xSize, centerY - xSize);
+                        ctx.lineTo(centerX + xSize, centerY + xSize);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(centerX + xSize, centerY - xSize);
+                        ctx.lineTo(centerX - xSize, centerY + xSize);
+                        ctx.stroke();
+                    }
+                    
+                    errorFrame++;
+                    if (errorFrame >= errorFrames) {
+                        clearInterval(errorAnimation);
+                    }
+                    
+                    ctx.restore();
+                }, 33);
+                
+                // Show error message
+                const errorTooltip = document.createElement('div');
+                errorTooltip.className = 'selection-tooltip';
+                errorTooltip.textContent = 'Error processing selection. Please try again.';
+                document.body.appendChild(errorTooltip);
+                
+                const tooltipX = x * scale + panX + (width * scale / 2);
+                const tooltipY = y * scale + panY - 20;
+                errorTooltip.style.left = `${tooltipX}px`;
+                errorTooltip.style.top = `${tooltipY}px`;
+                
+                // Remove tooltip after 3 seconds
+                setTimeout(() => {
+                    document.body.removeChild(errorTooltip);
+                }, 3000);
+                
             } finally {
                 // Remove the processing indicator
                 document.body.removeChild(selectionOverlay);
             }
         } catch (error) {
             console.error('Selection process error:', error);
+            clearInterval(pulseInterval);
         }
     } else {
-        // If selection is too small, give visual feedback
+        // If selection is too small, give enhanced visual feedback
         ctx.save();
         ctx.setTransform(scale, 0, 0, scale, panX, panY);
-        ctx.strokeStyle = 'rgba(220, 50, 50, 0.8)';
-        ctx.lineWidth = 2 / scale;
+        
         const x = Math.min(selectionStart.x, selectionEnd.x);
         const y = Math.min(selectionStart.y, selectionEnd.y);
-        ctx.strokeRect(x, y, width, height);
-        ctx.restore();
         
-        // Create and show a tooltip
+        // Animated feedback for too small selection
+        let pulseCount = 0;
+        const maxPulses = 3;
+        
+        const smallSelectionAnimation = setInterval(() => {
+            // Clear previous drawing
+            redrawCanvas();
+            
+            // Draw pulsing red rectangle
+            const pulse = Math.sin(pulseCount * 0.7);
+            const alpha = 0.3 + 0.3 * Math.abs(pulse);
+            
+            ctx.save();
+            ctx.setTransform(scale, 0, 0, scale, panX, panY);
+            ctx.strokeStyle = `rgba(220, 50, 50, ${alpha})`;
+            ctx.fillStyle = `rgba(220, 50, 50, ${alpha/3})`;
+            ctx.lineWidth = 2 / scale;
+            
+            // Draw with slight expansion effect
+            const expand = 2 * Math.abs(pulse) / scale;
+            ctx.fillRect(x - expand, y - expand, width + expand*2, height + expand*2);
+            ctx.strokeRect(x - expand, y - expand, width + expand*2, height + expand*2);
+            
+            pulseCount += 0.5;
+            if (pulseCount >= maxPulses * Math.PI) {
+                clearInterval(smallSelectionAnimation);
+                redrawCanvas(); // Clean up after animation
+            }
+            
+            ctx.restore();
+        }, 50);
+        
+        // Create and show an improved tooltip
         const tooltip = document.createElement('div');
         tooltip.className = 'selection-tooltip';
-        tooltip.textContent = 'Selection too small - draw a larger box around text';
+        tooltip.innerHTML = `
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>Please select a larger area with text</div>
+        `;
         document.body.appendChild(tooltip);
         
-        // Position tooltip near the selection
-        const viewportX = selectionStart.x * scale + panX;
-        const viewportY = selectionStart.y * scale + panY;
+        // Position tooltip more precisely
+        const viewportX = (selectionStart.x + selectionEnd.x) / 2 * scale + panX;
+        const viewportY = Math.min(selectionStart.y, selectionEnd.y) * scale + panY - 50;
         tooltip.style.left = `${viewportX}px`;
-        tooltip.style.top = `${viewportY - 40}px`;
+        tooltip.style.top = `${viewportY}px`;
         
-        // Remove tooltip after 2 seconds
+        // Fade in and out animation for tooltip
+        let opacity = 0;
+        tooltip.style.opacity = '0';
+        
+        const fadeIn = setInterval(() => {
+            opacity += 0.1;
+            tooltip.style.opacity = opacity.toString();
+            if (opacity >= 1) clearInterval(fadeIn);
+        }, 30);
+        
+        // Remove tooltip after animation
         setTimeout(() => {
-            document.body.removeChild(tooltip);
+            let fadeOut = setInterval(() => {
+                opacity -= 0.1;
+                tooltip.style.opacity = opacity.toString();
+                if (opacity <= 0) {
+                    clearInterval(fadeOut);
+                    document.body.removeChild(tooltip);
+                }
+            }, 30);
         }, 2000);
     }
     
@@ -849,41 +1100,65 @@ export function drawTextOnCanvas(text, x, y, maxWidth, maxHeight = Infinity) {
     return (currentY + lineHeight - y) / scale; // Return the height used, adjusted for scale
 }
 
+// Draw handwriting strokes on the canvas directly
+export async function drawHandwritingOnCanvas(text, x, y, maxWidth, options = {}) {
+    try {
+        // Import the handwriting simulation module dynamically
+        const { renderHandwritingOnCanvas, handwritingStyles } = await import('./handwritingSimulation.js');
+        
+        // Get theme-based color
+        const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+        const color = isDarkMode ? 
+            getComputedStyle(document.documentElement).getPropertyValue('--ink-color').trim() : 
+            '#000000';
+        
+        // Set default style for handwriting
+        const styleName = options.style || 'cursive';
+        const style = handwritingStyles[styleName] || handwritingStyles.cursive;
+        
+        // Adjust for current zoom and pan
+        ctx.save();
+        ctx.setTransform(scale, 0, 0, scale, panX, panY);
+        
+        // Render the handwriting
+        await renderHandwritingOnCanvas(ctx, text, x, y, maxWidth, {
+            fontSize: options.fontSize || 20,
+            ...style,
+            color
+        });
+        
+        ctx.restore();
+        
+        // Redraw the canvas to show the new handwriting
+        refreshCanvas();
+        
+        return true;
+    } catch (error) {
+        console.error('Error drawing handwriting on canvas:', error);
+        return false;
+    }
+}
+
 async function redrawNotebookItems() {
     const items = await getAllNotebookItems();
+    const textOverlaysContainer = document.getElementById('text-overlays');
+    
+    // Clear existing overlays
+    textOverlaysContainer.innerHTML = '';
     
     // Get theme-based colors
     const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
-    const textColor = isDarkMode ? 
-        getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() : 
-        '#000000';
     const highlightColor = isDarkMode ?
         'rgba(80, 180, 250, 0.2)' :
         'rgba(255, 255, 200, 0.4)';
-    const bgColor = isDarkMode ?
-        'rgba(40, 40, 40, 0.7)' :
-        'rgba(255, 255, 255, 0.7)';
     
     items.forEach(item => {
         if (item && item.selectionBox) {
-            const { selectionBox, transcription, chatHistory } = item;
+            const { selectionBox, transcription, chatHistory, id } = item;
             
-            // Create a better layout with proper padding
-            const padding = 15 / scale;
-            const startX = selectionBox.x;
-            const startY = selectionBox.y + selectionBox.height + 15 / scale;
-            const width = Math.max(300, selectionBox.width) / scale;
-            let currentY = startY + padding;
-            
-            // Draw background for text area
+            // Draw highlighted selection area on canvas
             ctx.save();
             ctx.setTransform(scale, 0, 0, scale, panX, panY);
-            
-            // Draw a rectangular background with rounded corners
-            ctx.fillStyle = bgColor;
-            const cornerRadius = 10 / scale;
-            
-            // Draw highlighted selection area
             ctx.fillStyle = highlightColor;
             ctx.fillRect(
                 selectionBox.x, 
@@ -891,76 +1166,258 @@ async function redrawNotebookItems() {
                 selectionBox.width, 
                 selectionBox.height
             );
-            
-            // Estimate total height based on text content
-            const transcriptionLines = Math.ceil(transcription.length / 40); // rough estimate
-            
-            // Find the last AI message
-            const lastAIMessage = chatHistory && chatHistory.filter(message => message.role === 'assistant').pop();
-            let aiMessageLines = 0;
-            if (lastAIMessage) {
-                aiMessageLines = Math.ceil(lastAIMessage.content.length / 40); // rough estimate
-            }
-            
-            // Calculate estimated height for content
-            const estimatedHeight = (transcriptionLines + aiMessageLines + 3) * 20 / scale;
-            
-            // Draw rounded rectangle for response
-            roundedRect(
-                ctx,
-                startX, 
-                startY, 
-                width, 
-                estimatedHeight + padding * 2,
-                cornerRadius
-            );
-            
-            // Set text color
-            ctx.fillStyle = textColor;
-            ctx.font = `${14/scale}px Arial`;
-            
-            // Draw user text
-            ctx.font = `bold ${14/scale}px Arial`;
-            ctx.fillText('You wrote:', startX + padding, currentY);
-            currentY += 20 / scale;
-            
-            // Regular font for content
-            ctx.font = `${14/scale}px Arial`;
-            
-            // Draw the transcription text and update currentY
-            let transcriptionHeight = drawTextOnCanvas(
-                transcription, 
-                startX + padding * 2, 
-                currentY, 
-                width - padding * 3
-            );
-            
-            currentY += transcriptionHeight + 15 / scale;
-            
-            // Draw AI response if available
-            if (lastAIMessage) {
-                // Draw header for AI response
-                ctx.font = `bold ${14/scale}px Arial`;
-                ctx.fillText('Claude:', startX + padding, currentY);
-                currentY += 20 / scale;
-                
-                // Regular font for content
-                ctx.font = `${14/scale}px Arial`;
-                
-                // Draw the AI response text
-                drawTextOnCanvas(
-                    lastAIMessage.content, 
-                    startX + padding * 2, 
-                    currentY, 
-                    width - padding * 3
-                );
-            }
-            
             ctx.restore();
+            
+            // Calculate positions for overlays
+            const startX = selectionBox.x * scale + panX;
+            const startY = (selectionBox.y + selectionBox.height) * scale + panY + 15;
+            const maxWidth = Math.max(300, selectionBox.width * scale);
+            
+            // Create user text bubble with controls
+            const userBubble = document.createElement('div');
+            userBubble.className = 'text-bubble user-text';
+            userBubble.id = `user-text-${id}`;
+            userBubble.innerHTML = `
+                <h4>You wrote:</h4>
+                <div class="content">${transcription}</div>
+                <div class="bubble-controls">
+                    <button class="bubble-control-btn bubble-toggle-btn" title="Collapse/Expand">
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                    <button class="bubble-control-btn bubble-remove-btn" title="Hide">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            // Position the user bubble
+            userBubble.style.left = `${startX}px`;
+            userBubble.style.top = `${startY}px`;
+            userBubble.style.maxWidth = `${maxWidth}px`;
+            userBubble.style.transform = `scale(${scale})`;
+            textOverlaysContainer.appendChild(userBubble);
+            
+            // Add AI response bubble if available
+            const lastAIMessage = chatHistory && chatHistory.filter(message => message.role === 'assistant').pop();
+            if (lastAIMessage) {
+                // Calculate position below user bubble
+                const userBubbleHeight = userBubble.offsetHeight;
+                const aiBubbleY = startY + userBubbleHeight * scale + 10;
+                
+                // Create AI response bubble with handwritten-style text and controls
+                const aiBubble = document.createElement('div');
+                aiBubble.className = 'text-bubble ai-response font-caveat'; // Default handwriting font
+                aiBubble.id = `ai-text-${id}`;
+                aiBubble.innerHTML = `
+                    <h4>Claude:</h4>
+                    <div class="content">${lastAIMessage.content}</div>
+                    <div class="bubble-controls">
+                        <button class="bubble-control-btn bubble-toggle-btn" title="Collapse/Expand">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                        <button class="bubble-control-btn bubble-remove-btn" title="Hide">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button class="bubble-control-btn bubble-font-btn" title="Change Font">
+                            <i class="fas fa-font"></i>
+                        </button>
+                    </div>
+                    <select class="font-selector" title="Change font style" style="display: none;">
+                        <option value="font-caveat" selected>Caveat</option>
+                        <option value="font-architects-daughter">Architects Daughter</option>
+                        <option value="font-indie-flower">Indie Flower</option>
+                        <option value="font-dancing-script">Dancing Script</option>
+                        <option value="font-normal">Normal</option>
+                    </select>
+                `;
+                
+                // Position the AI bubble
+                aiBubble.style.left = `${startX}px`;
+                aiBubble.style.top = `${aiBubbleY}px`;
+                aiBubble.style.maxWidth = `${maxWidth}px`;
+                aiBubble.style.transform = `scale(${scale})`;
+                textOverlaysContainer.appendChild(aiBubble);
+            }
         } else {
             console.warn('Encountered an invalid notebook item:', item);
         }
     });
+    
+    // Add event listeners for bubbles
+    const bubbles = document.querySelectorAll('.text-bubble');
+    bubbles.forEach(bubble => {
+        // Allow for dragging to reposition bubbles
+        bubble.addEventListener('mousedown', startDraggingBubble);
+        
+        // Double-click to edit text (for user bubbles only)
+        if (bubble.classList.contains('user-text')) {
+            bubble.addEventListener('dblclick', (e) => {
+                // Don't allow editing if clicked on controls
+                if (e.target.closest('.bubble-controls')) return;
+                
+                const content = bubble.querySelector('.content');
+                content.contentEditable = 'true';
+                content.focus();
+            });
+            
+            // Save changes on blur
+            const content = bubble.querySelector('.content');
+            content.addEventListener('blur', (e) => {
+                content.contentEditable = 'false';
+                // TODO: Save edited content
+            });
+        }
+        
+        // Handle bubble toggle (collapse/expand)
+        const toggleBtn = bubble.querySelector('.bubble-toggle-btn');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                bubble.classList.toggle('collapsed');
+                
+                // Save collapse state in localStorage
+                const bubbleId = bubble.id;
+                if (bubble.classList.contains('collapsed')) {
+                    localStorage.setItem(`${bubbleId}-collapsed`, 'true');
+                } else {
+                    localStorage.removeItem(`${bubbleId}-collapsed`);
+                }
+            });
+            
+            // Check if this bubble was previously collapsed
+            const bubbleId = bubble.id;
+            const wasCollapsed = localStorage.getItem(`${bubbleId}-collapsed`);
+            if (wasCollapsed === 'true') {
+                bubble.classList.add('collapsed');
+            }
+        }
+        
+        // Handle bubble removal
+        const removeBtn = bubble.querySelector('.bubble-remove-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                bubble.style.display = 'none';
+                
+                // Save hidden state in localStorage
+                const bubbleId = bubble.id;
+                localStorage.setItem(`${bubbleId}-hidden`, 'true');
+            });
+            
+            // Check if this bubble was previously hidden
+            const bubbleId = bubble.id;
+            const wasHidden = localStorage.getItem(`${bubbleId}-hidden`);
+            if (wasHidden === 'true') {
+                bubble.style.display = 'none';
+            }
+        }
+        
+        // Handle font selection for AI responses
+        if (bubble.classList.contains('ai-response')) {
+            const fontSelector = bubble.querySelector('.font-selector');
+            const fontBtn = bubble.querySelector('.bubble-font-btn');
+            
+            // Toggle font selector visibility
+            if (fontBtn && fontSelector) {
+                fontBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    fontSelector.style.display = fontSelector.style.display === 'none' ? 'block' : 'none';
+                });
+            }
+            
+            if (fontSelector) {
+                fontSelector.addEventListener('change', (e) => {
+                    // Remove all font classes
+                    bubble.classList.remove(
+                        'font-caveat',
+                        'font-architects-daughter',
+                        'font-indie-flower',
+                        'font-dancing-script',
+                        'font-normal'
+                    );
+                    
+                    // Add the selected font class
+                    bubble.classList.add(e.target.value);
+                    
+                    // Store the bubble-specific font preference
+                    const bubbleId = bubble.id;
+                    localStorage.setItem(`${bubbleId}-font`, e.target.value);
+                    
+                    // Hide the selector after selection
+                    fontSelector.style.display = 'none';
+                });
+                
+                // Apply the bubble-specific font preference if available
+                const bubbleId = bubble.id;
+                const bubbleFont = localStorage.getItem(`${bubbleId}-font`);
+                
+                if (bubbleFont) {
+                    bubble.classList.remove(
+                        'font-caveat',
+                        'font-architects-daughter',
+                        'font-indie-flower',
+                        'font-dancing-script',
+                        'font-normal'
+                    );
+                    bubble.classList.add(bubbleFont);
+                    fontSelector.value = bubbleFont;
+                }
+            }
+        }
+        
+        // Allow clicking on collapsed bubbles to expand them
+        bubble.addEventListener('click', (e) => {
+            if (bubble.classList.contains('collapsed') && 
+                !e.target.closest('.bubble-controls')) {
+                bubble.classList.remove('collapsed');
+                localStorage.removeItem(`${bubble.id}-collapsed`);
+            }
+        });
+    });
+}
+
+// Function to handle dragging bubbles
+function startDraggingBubble(e) {
+    const bubble = e.currentTarget;
+    let isDragging = false;
+    let startX = e.clientX;
+    let startY = e.clientY;
+    let initialLeft = parseInt(bubble.style.left);
+    let initialTop = parseInt(bubble.style.top);
+    
+    // Only start dragging if not clicking on text content
+    if (e.target.classList.contains('content') || e.target.tagName === 'H4') {
+        return;
+    }
+    
+    // Mouse move handler for dragging
+    function handleDragMove(e) {
+        if (!isDragging) {
+            isDragging = true;
+            bubble.style.opacity = '0.8';
+            bubble.style.cursor = 'grabbing';
+        }
+        
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        
+        bubble.style.left = `${initialLeft + dx}px`;
+        bubble.style.top = `${initialTop + dy}px`;
+    }
+    
+    // Mouse up handler to end dragging
+    function handleDragEnd() {
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+        
+        if (isDragging) {
+            bubble.style.opacity = '1';
+            bubble.style.cursor = 'text';
+        }
+    }
+    
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
 }
 
 // Helper function to draw rounded rectangles

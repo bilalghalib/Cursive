@@ -128,6 +128,188 @@ body {
     position: absolute;
     top: 0;
     left: 0;
+    z-index: 10;
+}
+#text-overlays {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 20;
+}
+
+/* Selectable text bubble style */
+.text-bubble {
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.85);
+    border-radius: 8px;
+    padding: 12px 15px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    pointer-events: auto;
+    cursor: text;
+    user-select: text;
+    transition: all 0.2s ease;
+    overflow: visible;
+    z-index: 25;
+    transform-origin: top left;
+}
+
+/* Collapsed state for text bubbles */
+.text-bubble.collapsed {
+    max-height: 36px;
+    overflow: hidden;
+    padding: 8px 15px;
+    opacity: 0.9;
+    cursor: pointer;
+}
+
+.text-bubble.collapsed .content {
+    display: none;
+}
+
+.text-bubble.collapsed h4 {
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Bubble controls */
+.bubble-controls {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    display: flex;
+    gap: 8px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.text-bubble:hover .bubble-controls {
+    opacity: 1;
+}
+
+.bubble-control-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: transparent;
+    border: none;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0;
+    transition: all 0.2s ease;
+}
+
+.bubble-control-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.text-bubble.collapsed .bubble-controls {
+    right: 5px;
+    top: 2px;
+}
+
+.bubble-toggle-btn i {
+    transition: transform 0.3s ease;
+}
+
+.text-bubble.collapsed .bubble-toggle-btn i {
+    transform: rotate(180deg);
+}
+
+.text-bubble.ai-response {
+    border-left: 4px solid var(--primary-color);
+    font-family: 'Caveat', cursive;
+    font-size: 1.2rem;
+}
+
+.text-bubble.user-text {
+    border-left: 4px solid rgba(80, 80, 80, 0.5);
+}
+
+.text-bubble h4 {
+    margin: 0 0 6px 0;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    opacity: 0.8;
+    font-family: Arial, sans-serif; /* Keep headers in standard font */
+}
+
+.text-bubble .content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+}
+
+/* Handwriting style for AI responses */
+.text-bubble.ai-response .content {
+    line-height: 1.6;
+    letter-spacing: 0.5px;
+}
+
+/* Font selector in response bubbles */
+.font-selector {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    opacity: 0.6;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-color);
+    border: none;
+    background: transparent;
+    padding: 2px 5px;
+    transition: all 0.2s;
+}
+
+.font-selector:hover {
+    opacity: 1;
+}
+
+/* Font options for AI responses */
+.font-architects-daughter {
+    font-family: 'Architects Daughter', cursive;
+    font-size: 1.1rem;
+}
+
+.font-caveat {
+    font-family: 'Caveat', cursive;
+    font-size: 1.2rem;
+}
+
+.font-indie-flower {
+    font-family: 'Indie Flower', cursive;
+    font-size: 1.1rem;
+}
+
+.font-dancing-script {
+    font-family: 'Dancing Script', cursive;
+    font-size: 1.25rem;
+}
+
+.font-normal {
+    font-family: Arial, sans-serif;
+    font-size: 1rem;
+}
+
+/* Dark mode styles */
+[data-theme="dark"] .text-bubble {
+    background-color: rgba(40, 40, 40, 0.85);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Add visible selection highlighting */
+::selection {
+    background-color: var(--primary-color);
+    color: white;
 }
 
 .modal {
@@ -204,12 +386,95 @@ body {
     line-height: 1.5;
 }
 
+/* Chat message styling */
+.chat-message {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.chat-message:last-child {
+    border-bottom: none;
+}
+
+.chat-message strong {
+    color: var(--primary-color);
+    margin-right: 8px;
+}
+
+.user-message {
+    background-color: rgba(0, 0, 0, 0.03);
+    padding: 10px;
+    border-radius: 8px;
+    margin-left: 20px;
+    border-left: 3px solid var(--primary-color);
+}
+
+.ai-message {
+    font-family: 'Caveat', cursive;
+    font-size: 1.2rem;
+}
+
+.handwriting-preview {
+    margin-top: 10px;
+    padding: 5px;
+    background-color: white;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.handwriting-container {
+    margin-top: 10px;
+    padding: 5px 0;
+    overflow-x: hidden;
+}
+
+.handwriting-container svg {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .user-message {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .handwriting-preview {
+    background-color: var(--surface-color);
+}
+
 .chat-input-container {
     display: flex;
+    flex-wrap: wrap;
     margin-top: auto;
     border-top: 1px solid var(--border-color);
     padding: 15px;
     background-color: var(--surface-color);
+}
+
+.input-options {
+    display: flex;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.input-option-btn {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin-right: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.input-option-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
 }
 
 #chat-input {
@@ -228,6 +493,45 @@ body {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+#chat-drawing-container {
+    flex: 1;
+    position: relative;
+    height: 100px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: white;
+    overflow: hidden;
+}
+
+#chat-drawing-container.hidden {
+    display: none;
+}
+
+#chat-drawing-canvas {
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+}
+
+#clear-drawing-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 12px;
+    opacity: 0.8;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+#clear-drawing-btn:hover {
+    opacity: 1;
 }
 
 #send-chat-btn {
@@ -549,4 +853,207 @@ touch-action: manipulation;
     transform: scale(1);
     opacity: 1;
   }
+}
+
+@keyframes fadeOut {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--primary-color);
+  color: white;
+  padding: 12px 25px;
+  border-radius: 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  font-weight: bold;
+}
+
+/* Direct Chat Button and Prompt Panel */
+#direct-chat-button {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 50;
+}
+
+#direct-chat-button i {
+  font-size: 22px;
+  margin-bottom: 2px;
+}
+
+#direct-chat-button span {
+  font-size: 12px;
+  font-weight: bold;
+}
+
+#direct-chat-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+#direct-chat-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+#write-prompt-panel {
+  position: fixed;
+  bottom: 100px;
+  right: 30px;
+  width: 400px;
+  height: 300px;
+  background-color: var(--background-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+#write-prompt-panel.hidden {
+  transform: translateX(420px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background-color: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-color);
+}
+
+.close-panel-btn {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.close-panel-btn:hover {
+  opacity: 1;
+}
+
+.panel-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+#prompt-canvas {
+  flex: 1;
+  background-color: white;
+  cursor: crosshair;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.prompt-controls {
+  display: flex;
+  padding: 10px;
+  background-color: var(--surface-color);
+  justify-content: space-between;
+}
+
+.prompt-controls button {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prompt-controls button:hover {
+  background-color: var(--active-color);
+}
+
+#submit-prompt-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+#submit-prompt-btn:hover {
+  opacity: 0.9;
+}
+
+/* Select text tooltip for improved UX */
+.select-tooltip {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1000;
+  text-align: center;
+  max-width: 80%;
+}
+
+.select-tooltip.visible {
+  opacity: 1;
+}
+
+.select-tooltip i {
+  font-size: 24px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* Improved selection box styling */
+.selection-box {
+  position: absolute;
+  border: 2px dashed var(--primary-color);
+  background-color: rgba(0, 123, 255, 0.1);
+  pointer-events: none;
+  z-index: 30;
 }
