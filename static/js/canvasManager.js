@@ -650,15 +650,44 @@ async function handleSelection() {
     const width = Math.abs(selectionEnd.x - selectionStart.x);
     const height = Math.abs(selectionEnd.y - selectionStart.y);
     
+    // Only process if selection has reasonable size
     if (width > 5 && height > 5) {
+        // Add visual feedback during processing
         const x = Math.min(selectionStart.x, selectionEnd.x);
         const y = Math.min(selectionStart.y, selectionEnd.y);
         
+        // Highlight the selection with a pulse animation
+        let pulseCounter = 0;
+        const maxPulses = 3;
+        const pulseInterval = setInterval(() => {
+            ctx.save();
+            ctx.setTransform(scale, 0, 0, scale, panX, panY);
+            
+            // Draw a pulsing highlight rectangle
+            const alpha = 0.2 + 0.3 * Math.sin(pulseCounter * 0.5);
+            ctx.fillStyle = `rgba(100, 150, 255, ${alpha})`;
+            ctx.fillRect(x, y, width, height);
+            
+            // Draw selection border
+            ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+            ctx.lineWidth = 2 / scale;
+            ctx.strokeRect(x, y, width, height);
+            
+            pulseCounter++;
+            if (pulseCounter >= maxPulses * Math.PI * 2) {
+                clearInterval(pulseInterval);
+            }
+            
+            ctx.restore();
+        }, 50);
+        
+        // Create a temporary canvas for the selection
         const selectionCanvas = document.createElement('canvas');
         selectionCanvas.width = width * scale;
         selectionCanvas.height = height * scale;
         const selectionCtx = selectionCanvas.getContext('2d');
         
+        // Capture the selected area from the main canvas
         selectionCtx.fillStyle = 'white';
         selectionCtx.fillRect(0, 0, selectionCanvas.width, selectionCanvas.height);
         
@@ -667,21 +696,93 @@ async function handleSelection() {
             0, 0, width * scale, height * scale
         );
         
+        // Build selection data
         const selectionDataUrl = selectionCanvas.toDataURL('image/png');
         const selectionData = {
             box: { x, y, width, height },
             imageData: selectionDataUrl
         };
+        
         try {
-            await handleImageSelection(selectionData);
+            // Show a small overlay indicating the selection is being processed
+            const selectionOverlay = document.createElement('div');
+            selectionOverlay.className = 'selection-processing';
+            selectionOverlay.innerHTML = `<div class="selection-indicator">
+                <i class="fas fa-brain"></i> 
+                <span>Processing selection...</span>
+            </div>`;
+            document.body.appendChild(selectionOverlay);
+            
+            // Position the overlay near the selection
+            const viewportX = x * scale + panX;
+            const viewportY = y * scale + panY;
+            selectionOverlay.style.left = `${viewportX + width * scale / 2}px`;
+            selectionOverlay.style.top = `${viewportY + height * scale + 20}px`;
+            
+            try {
+                // Process the selection
+                await handleImageSelection(selectionData);
+                
+                // Clear the pulse animation
+                clearInterval(pulseInterval);
+                
+                // Draw a success indicator
+                ctx.save();
+                ctx.setTransform(scale, 0, 0, scale, panX, panY);
+                ctx.strokeStyle = 'rgba(40, 180, 100, 0.8)';
+                ctx.lineWidth = 2 / scale;
+                ctx.strokeRect(x, y, width, height);
+                ctx.restore();
+            } catch (error) {
+                console.error('Error handling image selection:', error);
+                
+                // Show error indicator on the canvas
+                ctx.save();
+                ctx.setTransform(scale, 0, 0, scale, panX, panY);
+                ctx.strokeStyle = 'rgba(220, 50, 50, 0.8)';
+                ctx.lineWidth = 2 / scale;
+                ctx.strokeRect(x, y, width, height);
+                ctx.restore();
+                
+                alert('Error processing selection. Please try again.');
+            } finally {
+                // Remove the processing indicator
+                document.body.removeChild(selectionOverlay);
+            }
         } catch (error) {
-            console.error('Error handling image selection:', error);
-            alert('Error processing image. Please try again.');
+            console.error('Selection process error:', error);
         }
+    } else {
+        // If selection is too small, give visual feedback
+        ctx.save();
+        ctx.setTransform(scale, 0, 0, scale, panX, panY);
+        ctx.strokeStyle = 'rgba(220, 50, 50, 0.8)';
+        ctx.lineWidth = 2 / scale;
+        const x = Math.min(selectionStart.x, selectionEnd.x);
+        const y = Math.min(selectionStart.y, selectionEnd.y);
+        ctx.strokeRect(x, y, width, height);
+        ctx.restore();
+        
+        // Create and show a tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'selection-tooltip';
+        tooltip.textContent = 'Selection too small - draw a larger box around text';
+        document.body.appendChild(tooltip);
+        
+        // Position tooltip near the selection
+        const viewportX = selectionStart.x * scale + panX;
+        const viewportY = selectionStart.y * scale + panY;
+        tooltip.style.left = `${viewportX}px`;
+        tooltip.style.top = `${viewportY - 40}px`;
+        
+        // Remove tooltip after 2 seconds
+        setTimeout(() => {
+            document.body.removeChild(tooltip);
+        }, 2000);
     }
     
+    // Return to drawing mode
     setDrawMode();
-    ctx.strokeStyle = 'black';
     
     isProcessing = false;
 }

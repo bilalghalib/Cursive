@@ -71,9 +71,19 @@
     </div>
     <div id="response-modal" class="modal">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>AI Response</h2>
+            <div class="modal-header">
+                <h2>Chat with Claude</h2>
+                <div class="modal-actions">
+                    <button id="continue-chat-btn" title="Continue this conversation"><i class="fas fa-comment"></i> Continue</button>
+                    <button id="new-prompt-btn" title="Start new prompt"><i class="fas fa-plus"></i> New</button>
+                    <span class="close" title="Close">&times;</span>
+                </div>
+            </div>
             <div id="response-content"></div>
+            <div class="chat-input-container">
+                <textarea id="chat-input" placeholder="Ask a follow-up question..." rows="2"></textarea>
+                <button id="send-chat-btn"><i class="fas fa-paper-plane"></i></button>
+            </div>
         </div>
     </div>
     <div id="prompt-modal" class="modal">
