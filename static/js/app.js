@@ -92,6 +92,8 @@ function setupEventListeners() {
     const exportBtn = document.getElementById('export-btn');
     const importBtn = document.getElementById('import-btn');
     const saveToWebBtn = document.getElementById('save-to-web-btn');
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const pdfExportBtn = document.getElementById('pdf-export-btn');
     
     drawBtn.addEventListener('click', () => {
         setDrawMode();
@@ -124,10 +126,76 @@ function setupEventListeners() {
     importBtn.addEventListener('click', handleImport);
     saveToWebBtn.addEventListener('click', handleSaveToWeb);
     
+    // Theme toggle handler
+    themeToggleBtn.addEventListener('click', () => {
+        toggleDarkMode();
+    });
+    
+    // PDF Export handler
+    if (pdfExportBtn) {
+        pdfExportBtn.addEventListener('click', handlePdfExport);
+    }
+    
     newSessionBtn.addEventListener('click', async (e) => {
         e.preventDefault();
         await startNewSession();
     });
+    
+    // Initialize theme based on user preference or system setting
+    initializeTheme();
+}
+
+// Dark mode implementation
+function initializeTheme() {
+    // Check for saved theme preference or use system preference
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    if (savedTheme === 'dark' || (!savedTheme && prefersDarkScheme.matches)) {
+        document.body.setAttribute('data-theme', 'dark');
+        updateThemeToggleIcon(true);
+        updateCanvasColors(true);
+    } else {
+        document.body.setAttribute('data-theme', 'light');
+        updateThemeToggleIcon(false);
+        updateCanvasColors(false);
+    }
+}
+
+function toggleDarkMode() {
+    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+    
+    if (isDarkMode) {
+        document.body.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
+        updateThemeToggleIcon(false);
+        updateCanvasColors(false);
+    } else {
+        document.body.setAttribute('data-theme', 'dark');
+        localStorage.setItem('theme', 'dark');
+        updateThemeToggleIcon(true);
+        updateCanvasColors(true);
+    }
+    
+    // Redraw the canvas to reflect the theme change
+    redrawCanvas();
+}
+
+function updateThemeToggleIcon(isDarkMode) {
+    const icon = document.querySelector('#theme-toggle i');
+    if (isDarkMode) {
+        icon.classList.remove('fa-moon');
+        icon.classList.add('fa-sun');
+    } else {
+        icon.classList.remove('fa-sun');
+        icon.classList.add('fa-moon');
+    }
+}
+
+function updateCanvasColors(isDarkMode) {
+    // Instead of directly accessing ctx, use a function from canvasManager
+    // This will trigger a redraw with the updated colors
+    redrawCanvas();
 }
 
 
@@ -171,6 +239,8 @@ async function handleImageSelection(selectionData) {
         
         debugLog('Sending transcription to chat AI...');
         currentChatHistory.push({ role: 'user', content: transcription });
+        
+        // Get chat response from Claude (this now shows response modal)
         const chatResponse = await handleTranscriptionResponse(transcription);
         
         currentChatHistory.push({ role: 'assistant', content: chatResponse });
@@ -191,7 +261,17 @@ async function handleImageSelection(selectionData) {
         setDrawMode();
         setActiveButton(document.getElementById('draw-btn'));
         
-        redrawCanvas();
+        // No immediate redraw needed as modal is already showing response
+        // We'll redraw when the modal is closed
+        
+        // Add event listener to redraw after modal is closed
+        const modal = document.getElementById('response-modal');
+        const onModalClose = () => {
+            redrawCanvas();
+            modal.removeEventListener('click', onModalClose);
+        };
+        modal.addEventListener('click', onModalClose);
+        
     } catch (error) {
         console.error('Error handling image selection:', error);
         console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
@@ -207,8 +287,32 @@ async function handleImageSelection(selectionData) {
 async function handleTranscriptionResponse(transcription) {
     try {
         showLoading();
-        const chatResponse = await sendChatToAI(currentChatHistory);
+        
+        // Get response modal elements
+        const modal = document.getElementById('response-modal');
+        const content = document.getElementById('response-content');
+        
+        // Show the modal with loading indicator
+        content.innerHTML = `
+            <p><strong>Transcription:</strong> ${transcription}</p>
+            <p><strong>AI is thinking...</strong> <span class="typing-indicator">...</span></p>
+        `;
+        modal.style.display = 'block';
+        
+        // Setup streaming response handler
+        let responseText = '';
+        const onProgress = (text) => {
+            responseText = text;
+            content.innerHTML = `
+                <p><strong>Transcription:</strong> ${transcription}</p>
+                <p><strong>AI:</strong> ${text}</p>
+            `;
+        };
+        
+        // Send the request with streaming enabled
+        const chatResponse = await sendChatToAI(currentChatHistory, onProgress);
         debugLog('Chat response:', chatResponse);
+        
         return chatResponse;
     } catch (error) {
         console.error('Error handling transcription response:', error);
@@ -225,6 +329,12 @@ async function loadNotebook() {
 }
 
 function displayFullResponse(item) {
+    // Don't show modal for items already displayed on canvas
+    // This prevents duplication between the popup and canvas drawing
+    if (item.displayed) {
+        return;
+    }
+    
     const modal = document.getElementById('response-modal');
     const content = document.getElementById('response-content');
     content.innerHTML = `
@@ -234,6 +344,9 @@ function displayFullResponse(item) {
         <p><strong>Tags:</strong> ${item.tags ? item.tags.join(', ') : 'No tags'}</p>
     `;
     modal.style.display = 'block';
+    
+    // Mark this item as displayed to prevent showing modal again
+    item.displayed = true;
 }
 
 async function startNewSession() {
@@ -285,6 +398,56 @@ async function handleExport() {
     } catch (error) {
         console.error('Error exporting notebook:', error);
         alert('Error exporting notebook. Please try again.');
+        hideLoading();
+    }
+}
+
+// PDF export functionality
+async function handlePdfExport() {
+    try {
+        showLoading();
+        
+        // Create a temporary canvas for PDF export
+        const tempCanvas = document.createElement('canvas');
+        const actualCanvas = document.getElementById('drawing-canvas');
+        tempCanvas.width = actualCanvas.width;
+        tempCanvas.height = actualCanvas.height;
+        
+        // Get the context and copy the current canvas content
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // Fill with background color
+        const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+        if (isDarkMode) {
+            tempCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-color').trim();
+        } else {
+            tempCtx.fillStyle = 'white';
+        }
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // Draw the canvas content to the temp canvas
+        tempCtx.drawImage(actualCanvas, 0, 0);
+        
+        // Convert the canvas to an image
+        const imgData = tempCanvas.toDataURL('image/png');
+        
+        // Create a PDF using jsPDF (using CDN, already included in index.html)
+        const { jsPDF } = window.jspdf;
+        
+        // Determine PDF orientation based on canvas dimensions
+        const orientation = tempCanvas.width > tempCanvas.height ? 'landscape' : 'portrait';
+        const pdf = new jsPDF(orientation, 'pt', [tempCanvas.width, tempCanvas.height]);
+        
+        // Add the image to the PDF
+        pdf.addImage(imgData, 'PNG', 0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // Save the PDF
+        pdf.save('cursive_notebook.pdf');
+        
+        hideLoading();
+    } catch (error) {
+        console.error('Error exporting PDF:', error);
+        alert('Error exporting to PDF. Please try again.');
         hideLoading();
     }
 }
@@ -411,10 +574,23 @@ window.addEventListener('pageshow', (event) => {
     }
 });
 
+// Improve modal behavior
 window.onclick = function(event) {
     const modal = document.getElementById('response-modal');
-    if (event.target == modal || event.target.className == 'close') {
+    const saveToWebModal = document.getElementById('save-to-web-modal');
+    
+    // Close response modal if clicking anywhere in the modal or on the close button
+    if (event.target == modal || 
+        event.target.closest('.modal-content') && modal.style.display === 'block' || 
+        event.target.className == 'close') {
         modal.style.display = 'none';
+        // Trigger redraw after closing the modal
+        redrawCanvas();
+    }
+    
+    // Handle save-to-web modal separately
+    if (event.target == saveToWebModal) {
+        saveToWebModal.style.display = 'none';
     }
 }
 

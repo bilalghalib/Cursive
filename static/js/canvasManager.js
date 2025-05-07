@@ -23,8 +23,7 @@ let panY = 0;
 let drawings = [];
 let currentStroke = [];
 
-let redrawInterval;
-const REDRAW_INTERVAL = 50; // Redraw every 50ms
+// Using requestAnimationFrame instead of interval for smoother rendering
 
 let undoStack = [];
 let redoStack = [];
@@ -47,7 +46,7 @@ export async function initCanvas() {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
-        fillCanvasWhite();
+        fillCanvasBackground();
         
         canvas.addEventListener('pointerdown', handlePointerDown);
         canvas.addEventListener('pointermove', handlePointerMove);
@@ -57,6 +56,9 @@ export async function initCanvas() {
         canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
         canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
         canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+        
+        // Add wheel event for intuitive zooming with mouse/trackpad
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
         
         canvas.style.touchAction = 'none';
         
@@ -82,20 +84,59 @@ export async function initCanvas() {
     }
 }
 
+// Improved touch handling with palm rejection and support for stylus
 function handleTouchStart(e) {
     e.preventDefault();
-    if (e.touches.length === 1 && touchIdentifier === null) {
+    
+    // Check if this is a stylus/pen input
+    const isPen = e.touches[0].touchType === 'stylus' || 
+                 (e.touches[0].pointerType === 'pen') || 
+                 (window.PointerEvent && e.touches[0].pointerType === 'pen');
+    
+    // For palm rejection: only accept touch if it's a pen or if we don't have an active touch
+    // and the touch area is small (finger touches have larger radiusX/Y than stylus)
+    const isSmallTouchArea = e.touches[0].radiusX < 15 && e.touches[0].radiusY < 15;
+    
+    if ((isPen || (touchIdentifier === null && isSmallTouchArea)) && e.touches.length === 1) {
         touchIdentifier = e.touches[0].identifier;
-        handlePointerDown(e.touches[0]);
+        
+        // Store touch start time for detecting tap-and-hold
+        const touch = e.touches[0];
+        touch.startTime = Date.now();
+        
+        // Enhanced position information
+        touch.clientX = touch.clientX || touch.pageX;
+        touch.clientY = touch.clientY || touch.pageY;
+        
+        handlePointerDown(touch);
     }
 }
 
 function handleTouchMove(e) {
     e.preventDefault();
-    if (e.touches.length === 1) {
+    
+    // Find our tracked touch
+    if (touchIdentifier !== null) {
         for (let i = 0; i < e.touches.length; i++) {
             if (e.touches[i].identifier === touchIdentifier) {
-                handlePointerMove(e.touches[i]);
+                const touch = e.touches[i];
+                
+                // Enhanced position information
+                touch.clientX = touch.clientX || touch.pageX;
+                touch.clientY = touch.clientY || touch.pageY;
+                
+                // Calculate velocity for smoother lines
+                if (lastX && lastY) {
+                    const now = Date.now();
+                    const dt = now - (touch.lastMoveTime || touch.startTime || now);
+                    if (dt > 0) {
+                        touch.velocityX = (touch.clientX - lastX) / dt;
+                        touch.velocityY = (touch.clientY - lastY) / dt;
+                        touch.lastMoveTime = now;
+                    }
+                }
+                
+                handlePointerMove(touch);
                 break;
             }
         }
@@ -104,9 +145,21 @@ function handleTouchMove(e) {
 
 function handleTouchEnd(e) {
     e.preventDefault();
+    
+    // Find our tracked touch that ended
     for (let i = 0; i < e.changedTouches.length; i++) {
         if (e.changedTouches[i].identifier === touchIdentifier) {
-            handlePointerUp(e.changedTouches[i]);
+            const touch = e.changedTouches[i];
+            
+            // Enhanced position information
+            touch.clientX = touch.clientX || touch.pageX;
+            touch.clientY = touch.clientY || touch.pageY;
+            
+            // Check if this was a tap-and-hold (long press)
+            const touchDuration = Date.now() - (touch.startTime || Date.now());
+            touch.isLongPress = touchDuration > 500; // 500ms threshold for long press
+            
+            handlePointerUp(touch);
             touchIdentifier = null;
             break;
         }
@@ -129,35 +182,79 @@ function handlePointerDown(e) {
             selectionStart = { x, y };
             savedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         } else if (mode === 'draw') {
+            // Get pressure if available (stylus)
+            let pressure = 1.0; // Default pressure
+            
+            if (e.pressure !== undefined && e.pressure !== 0) {
+                // Standard pressure (values between 0 and 1)
+                pressure = e.pressure;
+            } else if (e.force !== undefined && e.force !== 0) {
+                // iOS force touch (values between 0 and 1)
+                pressure = e.force;
+            } else if (e.touches && e.touches[0] && e.touches[0].force !== undefined && e.touches[0].force !== 0) {
+                // Touch with force data
+                pressure = e.touches[0].force;
+            }
+            
+            // Adjust the line width based on pressure
+            if (pressure !== 1.0) {
+                const baseLine = ctx.lineWidth;
+                const newLineWidth = baseLine * (0.5 + pressure * 1.5); // Scale between 50% and 200% of base line width
+                ctx.lineWidth = newLineWidth;
+            }
+            
             currentStroke = [];
-            addPointToStroke(x, y);
+            addPointToStroke(x, y, pressure);
         }
     }
     startRedrawInterval();
 }
 
 function handlePointerMove(e) {
+    // Get canvas coordinates accounting for current pan and zoom
     const { x, y } = getCanvasCoordinates(e);
+    
     if (isPanning) {
+        // Calculate more accurate delta movement with smoother panning
         const dx = e.clientX - lastX;
         const dy = e.clientY - lastY;
+        
+        // Apply pan movement
         panX += dx;
         panY += dy;
+        
+        // Add boundary constraints to prevent excessive panning
+        const maxPanX = canvas.width * 2;
+        const maxPanY = canvas.height * 2;
+        panX = Math.min(Math.max(-maxPanX, panX), maxPanX);
+        panY = Math.min(Math.max(-maxPanY, panY), maxPanY);
+        
+        // Update last position
         [lastX, lastY] = [e.clientX, e.clientY];
-        refreshCanvas();
+        
+        // Immediately refresh to avoid lag sensation
+        requestAnimationFrame(() => {
+            refreshCanvas();
+        });
     } else if (isZooming && mode === 'zoom' && isZoomMode) {
+        // Make vertical dragging zoom more intuitive
         const dy = e.clientY - zoomStartY;
-        if (dy < 0) {
+        
+        // Make zoom more responsive with a faster response
+        if (dy < -5) {
             zoomIn();
-        } else if (dy > 0) {
+            zoomStartY = e.clientY; // Reset start position after zoom
+        } else if (dy > 5) {
             zoomOut();
+            zoomStartY = e.clientY; // Reset start position after zoom
         }
-        zoomStartY = e.clientY;
     } else if (isDrawing) {
         if (mode === 'draw') {
+            // Drawing - add point to current stroke
             addPointToStroke(x, y);
             [lastX, lastY] = [x, y];
         } else if (mode === 'select') {
+            // Selection - update end point and redraw
             selectionEnd = { x, y };
             redrawCanvas();
         }
@@ -185,13 +282,25 @@ function handlePointerUp(e) {
     refreshCanvas();
 }
 
+let animationFrameId = null;
+
 function startRedrawInterval() {
     stopRedrawInterval();
-    redrawInterval = setInterval(redrawCanvas, REDRAW_INTERVAL);
+    
+    // Use requestAnimationFrame for smoother animation
+    function animate() {
+        redrawCanvas();
+        animationFrameId = requestAnimationFrame(animate);
+    }
+    
+    animationFrameId = requestAnimationFrame(animate);
 }
 
 function stopRedrawInterval() {
-    if (redrawInterval) clearInterval(redrawInterval);
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
 }
 
 export function undo() {
@@ -220,8 +329,9 @@ function refreshCanvas() {
     redrawNotebookItems();
 }
 
-function addPointToStroke(x, y) {
-    currentStroke.push({ x, y });
+function addPointToStroke(x, y, pressure = 1.0) {
+    // Store point with pressure information for variable width lines
+    currentStroke.push({ x, y, pressure });
 }
 
 function addDrawingAction(stroke) {
@@ -236,17 +346,66 @@ function drawStoredDrawings() {
     ctx.save();
     ctx.setTransform(scale, 0, 0, scale, panX, panY);
     
+    // Default line width from config
+    const defaultLineWidth = ctx.lineWidth;
+    
     drawings.forEach(stroke => {
         if (stroke.length > 1) {
-            ctx.beginPath();
-            ctx.moveTo(stroke[0].x, stroke[0].y);
-            for (let i = 1; i < stroke.length; i++) {
-                ctx.lineTo(stroke[i].x, stroke[i].y);
+            // For strokes with pressure information
+            if (stroke[0].pressure !== undefined) {
+                // Use a smoother curve algorithm for better writing
+                ctx.beginPath();
+                
+                // Start at the first point
+                ctx.moveTo(stroke[0].x, stroke[0].y);
+                
+                // For each segment, use a Bezier curve for smoother lines
+                for (let i = 1; i < stroke.length; i++) {
+                    const prevPoint = stroke[i-1];
+                    const currPoint = stroke[i];
+                    
+                    // Apply pressure to line width if available
+                    const prevPressure = prevPoint.pressure || 1.0;
+                    const currPressure = currPoint.pressure || 1.0;
+                    
+                    // Adjust line width based on pressure
+                    const prevWidth = defaultLineWidth * (0.5 + prevPressure * 1.5);
+                    const currWidth = defaultLineWidth * (0.5 + currPressure * 1.5);
+                    
+                    // Special case for variable width drawing through custom path
+                    if (Math.abs(prevWidth - currWidth) > 0.1) {
+                        // Finish the current path
+                        ctx.stroke();
+                        
+                        // Start a new path with the new width
+                        ctx.beginPath();
+                        ctx.lineWidth = currWidth;
+                        ctx.moveTo(prevPoint.x, prevPoint.y);
+                    }
+                    
+                    ctx.lineTo(currPoint.x, currPoint.y);
+                    ctx.stroke();
+                    
+                    // Reset path for next segment
+                    ctx.beginPath();
+                    ctx.moveTo(currPoint.x, currPoint.y);
+                }
+            } 
+            // For older strokes without pressure data
+            else {
+                ctx.lineWidth = defaultLineWidth;
+                ctx.beginPath();
+                ctx.moveTo(stroke[0].x, stroke[0].y);
+                for (let i = 1; i < stroke.length; i++) {
+                    ctx.lineTo(stroke[i].x, stroke[i].y);
+                }
+                ctx.stroke();
             }
-            ctx.stroke();
         }
     });
     
+    // Reset line width
+    ctx.lineWidth = defaultLineWidth;
     ctx.restore();
 }
 
@@ -254,18 +413,63 @@ function drawCurrentStroke() {
     if (currentStroke.length > 1) {
         ctx.save();
         ctx.setTransform(scale, 0, 0, scale, panX, panY);
+        
+        // Default line width from config
+        const defaultLineWidth = ctx.lineWidth;
+        
+        // Use a smoother curve algorithm for better writing
         ctx.beginPath();
         ctx.moveTo(currentStroke[0].x, currentStroke[0].y);
+        
+        // For each segment, apply pressure information
         for (let i = 1; i < currentStroke.length; i++) {
-            ctx.lineTo(currentStroke[i].x, currentStroke[i].y);
+            const prevPoint = currentStroke[i-1];
+            const currPoint = currentStroke[i];
+            
+            // Apply pressure to line width if available
+            const prevPressure = prevPoint.pressure || 1.0;
+            const currPressure = currPoint.pressure || 1.0;
+            
+            // Adjust line width based on pressure
+            const prevWidth = defaultLineWidth * (0.5 + prevPressure * 1.5);
+            const currWidth = defaultLineWidth * (0.5 + currPressure * 1.5);
+            
+            // Special case for variable width drawing
+            if (Math.abs(prevWidth - currWidth) > 0.1) {
+                // Finish the current path
+                ctx.stroke();
+                
+                // Start a new path with the new width
+                ctx.beginPath();
+                ctx.lineWidth = currWidth;
+                ctx.moveTo(prevPoint.x, prevPoint.y);
+            }
+            
+            ctx.lineTo(currPoint.x, currPoint.y);
+            ctx.stroke();
+            
+            // Reset path for next segment
+            ctx.beginPath();
+            ctx.moveTo(currPoint.x, currPoint.y);
         }
-        ctx.stroke();
+        
+        // Reset line width
+        ctx.lineWidth = defaultLineWidth;
         ctx.restore();
     }
 }
 
 export function redrawCanvas() {
-    fillCanvasWhite();
+    fillCanvasBackground();
+    
+    // Update stroke color based on theme
+    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+    if (isDarkMode) {
+        ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-color').trim();
+    } else {
+        ctx.strokeStyle = '#000000'; // Default black
+    }
+    
     drawStoredDrawings();
     drawCurrentStroke();
     if (mode === 'select' && isDrawing) {
@@ -288,11 +492,46 @@ function drawSelectionRect() {
     ctx.restore();
 }
 
-function fillCanvasWhite() {
+// Renamed to better reflect its purpose across themes
+function fillCanvasBackground() {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Use theme-appropriate canvas color
+    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+    if (isDarkMode) {
+        // For dark mode, use a subtle grid pattern to help with writing guidance
+        const darkBg = getComputedStyle(document.documentElement).getPropertyValue('--canvas-color').trim();
+        ctx.fillStyle = darkBg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw a subtle grid in dark mode for better depth perception
+        ctx.strokeStyle = 'rgba(80, 80, 80, 0.15)'; // Very subtle grid lines
+        ctx.lineWidth = 0.5;
+        
+        // Only draw grid if we're zoomed in enough to see it
+        if (scale > 0.5) {
+            const gridSize = 50; // Grid size in pixels
+            
+            ctx.beginPath();
+            // Vertical lines
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+            }
+            // Horizontal lines
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+            }
+            ctx.stroke();
+        }
+    } else {
+        // Light mode - simple white background
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
     ctx.restore();
 }
 
@@ -309,7 +548,7 @@ function resizeCanvas() {
     canvas.style.left = '0';
     canvas.style.top = toolbarHeight + 'px';
     
-    fillCanvasWhite();
+    fillCanvasBackground();
     redrawCanvas();
 }
 
@@ -354,25 +593,46 @@ function resetPanningCursor() {
 }
 
 export function zoomIn() {
-    zoom(canvas.width / 2, canvas.height / 2, 1.1);
+    zoom(canvas.width / 2, canvas.height / 2, 1.2); // Increased zoom factor for more noticeable change
 }
 
 export function zoomOut() {
-    zoom(canvas.width / 2, canvas.height / 2, 0.9);
+    zoom(canvas.width / 2, canvas.height / 2, 0.8); // Increased zoom factor for more noticeable change
 }
 
+// Improved zoom function with better center point calculation
 function zoom(centerX, centerY, delta) {
+    // Calculate the point we're zooming on in world coordinates
     const pointX = (centerX - panX) / scale;
     const pointY = (centerY - panY) / scale;
     
-    scale *= delta;
-    scale = Math.min(Math.max(0.1, scale), 10); // Limit scale between 0.1 and 10
+    // Update scale with smoother limits and constraints
+    const newScale = scale * delta;
+    scale = Math.min(Math.max(0.1, newScale), 5); // Limit scale between 0.1 and 5
     
+    // Adjust panning to keep the point under the cursor
     panX = centerX - pointX * scale;
     panY = centerY - pointY * scale;
     
+    // Add boundary constraints to prevent excessive panning
+    const maxPanX = canvas.width * 2;
+    const maxPanY = canvas.height * 2;
+    panX = Math.min(Math.max(-maxPanX, panX), maxPanX);
+    panY = Math.min(Math.max(-maxPanY, panY), maxPanY);
+    
     redrawCanvas();
     refreshCanvas();
+}
+
+// Add a new function for wheel-based zooming (more intuitive)
+function handleWheel(e) {
+    e.preventDefault();
+    
+    // Convert wheel delta to zoom factor
+    const delta = e.deltaY < 0 ? 1.1 : 0.9;
+    
+    // Zoom at the mouse position rather than center of screen
+    zoom(e.clientX, e.clientY, delta);
 }
 
 function getCanvasCoordinates(e) {
@@ -431,7 +691,7 @@ function clearCanvasOnly() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
-    fillCanvasWhite();
+    fillCanvasBackground();
 }
 
 export async function clearCanvas() {
@@ -490,27 +750,132 @@ export function drawTextOnCanvas(text, x, y, maxWidth, maxHeight = Infinity) {
 
 async function redrawNotebookItems() {
     const items = await getAllNotebookItems();
+    
+    // Get theme-based colors
+    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+    const textColor = isDarkMode ? 
+        getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() : 
+        '#000000';
+    const highlightColor = isDarkMode ?
+        'rgba(80, 180, 250, 0.2)' :
+        'rgba(255, 255, 200, 0.4)';
+    const bgColor = isDarkMode ?
+        'rgba(40, 40, 40, 0.7)' :
+        'rgba(255, 255, 255, 0.7)';
+    
     items.forEach(item => {
         if (item && item.selectionBox) {
             const { selectionBox, transcription, chatHistory } = item;
-            let currentY = selectionBox.y + selectionBox.height + 5 / scale;
-            const width = Math.max(400, selectionBox.width) / scale;
+            
+            // Create a better layout with proper padding
+            const padding = 15 / scale;
+            const startX = selectionBox.x;
+            const startY = selectionBox.y + selectionBox.height + 15 / scale;
+            const width = Math.max(300, selectionBox.width) / scale;
+            let currentY = startY + padding;
+            
+            // Draw background for text area
+            ctx.save();
+            ctx.setTransform(scale, 0, 0, scale, panX, panY);
+            
+            // Draw a rectangular background with rounded corners
+            ctx.fillStyle = bgColor;
+            const cornerRadius = 10 / scale;
+            
+            // Draw highlighted selection area
+            ctx.fillStyle = highlightColor;
+            ctx.fillRect(
+                selectionBox.x, 
+                selectionBox.y, 
+                selectionBox.width, 
+                selectionBox.height
+            );
+            
+            // Estimate total height based on text content
+            const transcriptionLines = Math.ceil(transcription.length / 40); // rough estimate
+            
+            // Find the last AI message
+            const lastAIMessage = chatHistory && chatHistory.filter(message => message.role === 'assistant').pop();
+            let aiMessageLines = 0;
+            if (lastAIMessage) {
+                aiMessageLines = Math.ceil(lastAIMessage.content.length / 40); // rough estimate
+            }
+            
+            // Calculate estimated height for content
+            const estimatedHeight = (transcriptionLines + aiMessageLines + 3) * 20 / scale;
+            
+            // Draw rounded rectangle for response
+            roundedRect(
+                ctx,
+                startX, 
+                startY, 
+                width, 
+                estimatedHeight + padding * 2,
+                cornerRadius
+            );
+            
+            // Set text color
+            ctx.fillStyle = textColor;
+            ctx.font = `${14/scale}px Arial`;
+            
+            // Draw user text
+            ctx.font = `bold ${14/scale}px Arial`;
+            ctx.fillText('You wrote:', startX + padding, currentY);
+            currentY += 20 / scale;
+            
+            // Regular font for content
+            ctx.font = `${14/scale}px Arial`;
             
             // Draw the transcription text and update currentY
-            let transcriptionHeight = drawTextOnCanvas(`Transcription: ${transcription}`, selectionBox.x, currentY, width);
-            currentY += transcriptionHeight + 5 / scale; // Update currentY to be just below the transcription text
+            let transcriptionHeight = drawTextOnCanvas(
+                transcription, 
+                startX + padding * 2, 
+                currentY, 
+                width - padding * 3
+            );
             
-            // Find the last AI message in the chat history
-            const lastAIMessage = chatHistory && chatHistory.filter(message => message.role === 'assistant').pop();
+            currentY += transcriptionHeight + 15 / scale;
+            
+            // Draw AI response if available
             if (lastAIMessage) {
-                // Draw the AI response text just below the transcription text
-                let aiResponseHeight = drawTextOnCanvas(`AI: ${lastAIMessage.content}`, selectionBox.x, currentY, width);
-                currentY += aiResponseHeight + 5 / scale; // Update currentY to be just below the AI response text
+                // Draw header for AI response
+                ctx.font = `bold ${14/scale}px Arial`;
+                ctx.fillText('Claude:', startX + padding, currentY);
+                currentY += 20 / scale;
+                
+                // Regular font for content
+                ctx.font = `${14/scale}px Arial`;
+                
+                // Draw the AI response text
+                drawTextOnCanvas(
+                    lastAIMessage.content, 
+                    startX + padding * 2, 
+                    currentY, 
+                    width - padding * 3
+                );
             }
+            
+            ctx.restore();
         } else {
             console.warn('Encountered an invalid notebook item:', item);
         }
     });
+}
+
+// Helper function to draw rounded rectangles
+function roundedRect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.fill();
 }
 
 export async function updateDrawings(newDrawings) {

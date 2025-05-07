@@ -61,6 +61,53 @@ def handle_claude_request():
     else:
         return build_actual_response(jsonify({"error": "Method not allowed"}), 405)
 
+@app.route('/api/claude/stream', methods=['POST', 'OPTIONS'])
+def handle_claude_stream_request():
+    if request.method == 'OPTIONS':
+        return build_preflight_response()
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            app.logger.debug(f"Received streaming data request: {data}")
+            
+            def generate():
+                # Create the message using the Anthropic client with streaming
+                with client.messages.stream(
+                    model=data['model'],
+                    max_tokens=data['max_tokens'],
+                    messages=data['messages']
+                ) as stream:
+                    for text in stream.text_stream:
+                        response_chunk = {
+                            "content": [{"text": text}],
+                            "model": data['model'],
+                            "role": "assistant"
+                        }
+                        yield f"data: {json.dumps(response_chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
+            
+            response = app.response_class(
+                generate(),
+                mimetype='text/event-stream'
+            )
+            
+            # Add CORS headers to the response
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Cache-Control", "no-cache")
+            response.headers.add("Connection", "keep-alive")
+            response.headers.add("X-Accel-Buffering", "no")  # For Nginx
+            
+            return response
+            
+        except anthropic.APIError as e:
+            app.logger.error(f"Anthropic API streaming error: {str(e)}")
+            return build_actual_response(jsonify({"error": str(e)}), 500)
+        except Exception as e:
+            app.logger.error(f"Unexpected streaming error: {str(e)}")
+            return build_actual_response(jsonify({"error": "An unexpected error occurred during streaming"}), 500)
+    else:
+        return build_actual_response(jsonify({"error": "Method not allowed"}), 405)
+
 def build_preflight_response():
     response = make_response()
     response.headers.add("Access-Control-Allow-Origin", "*")

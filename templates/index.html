@@ -17,22 +17,40 @@
     </head>
     <body>
         <div id="toolbar">
-        <div>
-            <button id="new-session-btn"><i class="fas fa-file"></i> New Page</button>
-            <button id="select-btn"><i class="fas fa-vector-square"></i> Select to Chat</button>
-            <button id="draw-btn" class="active"><i class="fas fa-pencil-alt"></i> </button>
-            <button id="pan-btn"><i class="fas fa-hand-paper"></i> </button>
-            <button id="undo-btn"><i class="fas fa-undo"></i> </button>
-            <button id="redo-btn"><i class="fas fa-redo"></i> </button>
-            <button id="zoom-btn"><i class="fas fa-search"></i> </button>
-            <button id="prompt-btn"><i class="fas fa-lightbulb"></i> Prompt Me</button>
-            <button id="about-btn"><i class="fas fa-info-circle"></i></button>
+        <div class="toolbar-section drawing-tools">
+            <!-- Drawing tools group -->
+            <button id="draw-btn" class="active" title="Draw"><i class="fas fa-pencil-alt"></i></button>
+            <button id="select-btn" title="Select to Chat"><i class="fas fa-vector-square"></i></button>
+            <button id="pan-btn" title="Pan Canvas"><i class="fas fa-hand-paper"></i></button>
+            <button id="zoom-btn" title="Zoom"><i class="fas fa-search"></i></button>
+        </div>
+        
+        <div class="toolbar-section history-tools">
+            <!-- History controls -->
+            <button id="undo-btn" title="Undo"><i class="fas fa-undo"></i></button>
+            <button id="redo-btn" title="Redo"><i class="fas fa-redo"></i></button>
+        </div>
+        
+        <div class="toolbar-section content-tools">
+            <!-- Content tools -->
+            <button id="prompt-btn" title="Get a Writing Prompt"><i class="fas fa-lightbulb"></i> Prompt</button>
+            <button id="new-session-btn" title="Start New Page"><i class="fas fa-file"></i> New</button>
+        </div>
+        
+        <div class="toolbar-section app-tools">
+            <!-- App controls -->
+            <button id="theme-toggle" title="Toggle Dark/Light Mode"><i class="fas fa-moon"></i></button>
+            <button id="save-to-web-btn" title="Save to Web"><i class="fas fa-globe"></i></button>
+            <button id="pdf-export-btn" title="Export to PDF"><i class="fas fa-file-pdf"></i></button>
+            <button id="about-btn" title="About"><i class="fas fa-info-circle"></i></button>
+            
+            <!-- More options dropdown -->
             <div class="dropdown">
-                <button id="more-options-btn"><i class="fas fa-ellipsis-h"></i></button>
+                <button id="more-options-btn" title="More Options"><i class="fas fa-ellipsis-h"></i></button>
                 <div class="dropdown-content">
                     <a id="export-btn" href="#"><i class="fas fa-file-export"></i> Export Data</a>
                     <a id="import-btn" href="#"><i class="fas fa-file-import"></i> Import Data</a>
-                    <a id="save-to-web-btn" href="#"><i class="fas fa-globe"></i> Save to Web</a>
+                    <a id="settings-btn" href="#"><i class="fas fa-cog"></i> Settings</a>
                 </div>
             </div>
         </div>
@@ -79,6 +97,7 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script type="module" src="{{ url_for('static', filename='js/config.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/dataManager.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/canvasManager.js') }}"></script>

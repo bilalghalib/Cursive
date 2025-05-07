@@ -1,3 +1,33 @@
+:root {
+    /* Light theme variables */
+    --background-color: #ffffff;
+    --surface-color: #f0f0f0;
+    --text-color: #333333;
+    --border-color: #cccccc;
+    --active-color: #e0e0e0;
+    --primary-color: #007bff;
+    --canvas-color: #ffffff;
+    --ink-color: #000000;
+    --modal-background: rgba(0, 0, 0, 0.4);
+    --modal-content-bg: #fefefe;
+    --spinner-color: #3498db;
+}
+
+[data-theme="dark"] {
+    /* Dark theme variables */
+    --background-color: #121212;
+    --surface-color: #1e1e1e;
+    --text-color: #e0e0e0;
+    --border-color: #444444;
+    --active-color: #333333;
+    --primary-color: #4dabf7;
+    --canvas-color: #1a1a1a;
+    --ink-color: #e0e0e0;
+    --modal-background: rgba(0, 0, 0, 0.7);
+    --modal-content-bg: #2c2c2c;
+    --spinner-color: #4dabf7;
+}
+
 body {
     font-family: Arial, sans-serif;
     margin: 0;
@@ -6,29 +36,93 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
+
 #toolbar {
-    padding: 10px;
-    background-color: #f0f0f0;
+    padding: 8px 15px;
+    background-color: var(--surface-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 100;
+    position: relative;
 }
-#toolbar button {
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 2px;
     margin-right: 10px;
-    padding: 5px 10px;
-    background-color: #fff;
-    border: 1px solid #ccc;
+    padding: 0 5px;
+}
+
+.toolbar-section.drawing-tools {
+    border-right: 1px solid var(--border-color);
+    padding-right: 10px;
+}
+
+.toolbar-section.history-tools {
+    border-right: 1px solid var(--border-color);
+    padding-right: 10px;
+}
+
+.toolbar-section.app-tools {
+    margin-left: auto;
+}
+
+#toolbar button {
+    margin: 0 2px;
+    padding: 6px 10px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
 }
+
+#toolbar button i {
+    font-size: 1rem;
+    margin-right: 4px;
+}
+
+#toolbar button:only-child i,
+#toolbar .drawing-tools button i,
+#toolbar .history-tools button i,
+#toolbar #theme-toggle i, 
+#toolbar #about-btn i,
+#toolbar #more-options-btn i,
+#toolbar #save-to-web-btn i,
+#toolbar #pdf-export-btn i {
+    margin-right: 0;
+}
+
+#toolbar button:hover {
+    background-color: var(--active-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+}
+
 #toolbar button.active {
-    background-color: #e0e0e0;
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
 }
 #canvas-container {
     flex-grow: 1;
     position: relative;
     overflow: hidden;
+    background-color: var(--canvas-color);
+    transition: background-color 0.3s ease;
 }
 #drawing-canvas {
     position: absolute;
@@ -44,21 +138,29 @@ body {
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.4);
+    background-color: var(--modal-background);
+    transition: background-color 0.3s ease;
 }
 .modal-content {
-    background-color: #fefefe;
+    background-color: var(--modal-content-bg);
+    color: var(--text-color);
     margin: 15% auto;
     padding: 20px;
-    border: 1px solid #888;
+    border: 1px solid var(--border-color);
     width: 80%;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 .close {
-    color: #aaa;
+    color: var(--text-color);
+    opacity: 0.7;
     float: right;
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;
+    transition: color 0.3s ease;
+}
+.close:hover {
+    opacity: 1;
 }
 #debug-console {
     position: fixed;
@@ -81,18 +183,20 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--modal-background);
     z-index: 1000;
     justify-content: center;
     align-items: center;
+    transition: background-color 0.3s ease;
 }
 .spinner {
     width: 50px;
     height: 50px;
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid #3498db;
+    border: 5px solid var(--background-color);
+    border-top: 5px solid var(--spinner-color);
     border-radius: 50%;
     animation: spin 1s linear infinite;
+    transition: border-color 0.3s ease;
 }
 @keyframes spin {
     0% { transform: rotate(0deg); }
@@ -106,81 +210,122 @@ body {
 .dropdown-content {
     display: none;
     position: absolute;
-    background-color: #f9f9f9;
+    background-color: var(--background-color);
     min-width: 160px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.3);
     z-index: 1;
     right: 0;
+    border: 1px solid var(--border-color);
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .dropdown-content a {
-    color: black;
+    color: var(--text-color);
     padding: 12px 16px;
     text-decoration: none;
     display: block;
+    transition: color 0.3s ease, background-color 0.3s ease;
 }
 
 .dropdown-content a:hover {
-    background-color: #f1f1f1;
+    background-color: var(--active-color);
 }
 
 .dropdown:hover .dropdown-content {
     display: block;
 }
+
+/* Dark mode toggle button */
+#theme-toggle {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+#theme-toggle i {
+    font-size: 1.2rem;
+    margin-right: 5px;
+}
+
 #file-drop-zone {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--modal-background);
     z-index: 1000;
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: background-color 0.3s ease;
 }
+
 #drop-zone-content {
-    background-color: white;
+    background-color: var(--background-color);
+    color: var(--text-color);
     padding: 20px;
     border-radius: 10px;
     text-align: center;
+    border: 1px solid var(--border-color);
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
+
 #file-select-btn {
     margin-top: 10px;
     padding: 10px 20px;
-    background-color: #4CAF50;
+    background-color: var(--primary-color);
     color: white;
     border: none;
     border-radius: 5px;
     cursor: pointer;
+    transition: background-color 0.3s ease;
 }
+
+#file-select-btn:hover {
+    opacity: 0.9;
+}
+
 #save-to-web-modal {
-display: none;
-position: fixed;
-z-index: 1000;
-left: 0;
-top: 0;
-width: 100%;
-height: 100%;
-background-color: rgba(0,0,0,0.4);
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--modal-background);
+    transition: background-color 0.3s ease;
 }
 
 #save-to-web-modal .modal-content {
-background-color: #fefefe;
-margin: 15% auto;
-padding: 20px;
-border: 1px solid #888;
-width: 80%;
-max-width: 500px;
+    background-color: var(--modal-content-bg);
+    color: var(--text-color);
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    width: 80%;
+    max-width: 500px;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 #save-to-web-url {
-word-break: break-all;
-margin-bottom: 10px;
+    word-break: break-all;
+    margin-bottom: 10px;
+    color: var(--primary-color);
+    transition: color 0.3s ease;
 }
 
 #save-to-web-modal button {
-margin-right: 10px;
+    margin-right: 10px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
 }
 html, body {
 -webkit-touch-callout: none;
@@ -192,4 +337,22 @@ touch-action: none;
 }
 #toolbar button {
 touch-action: manipulation;
+}
+
+/* Typing indicator animation */
+.typing-indicator {
+  display: inline-block;
+  animation: typingDots 1.4s infinite;
+}
+
+@keyframes typingDots {
+  0%, 20% {
+    content: ".";
+  }
+  40% {
+    content: "..";
+  }
+  60%, 100% {
+    content: "...";
+  }
 }

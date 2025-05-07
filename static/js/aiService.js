@@ -53,28 +53,84 @@ export async function sendImageToAI(imageData) {
   }
 }
 
-export async function sendChatToAI(chatHistory) {
+export async function sendChatToAI(chatHistory, onProgress = null) {
   try {
     const config = await getConfig();
-    const response = await fetch('/api/claude', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: config.claude.model,
-        max_tokens: config.claude.max_tokens,
-        messages: chatHistory
-      })
-    });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`AI API request failed: ${response.statusText}. Details: ${JSON.stringify(errorData)}`);
+    // If no progress callback is provided, use the standard non-streaming approach
+    if (!onProgress) {
+      const response = await fetch('/api/claude', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: config.claude.model,
+          max_tokens: config.claude.max_tokens,
+          messages: chatHistory
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`AI API request failed: ${response.statusText}. Details: ${JSON.stringify(errorData)}`);
+      }
+      
+      const data = await response.json();
+      return data.content[0].text;
+    } 
+    // If progress callback provided, use streaming approach
+    else {
+      const response = await fetch('/api/claude/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: config.claude.model,
+          max_tokens: config.claude.max_tokens,
+          messages: chatHistory,
+          stream: true
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`AI API streaming request failed: ${response.statusText}. Details: ${JSON.stringify(errorData)}`);
+      }
+      
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        try {
+          const lines = chunk.split('\n\n').filter(line => line.trim() !== '');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6);
+              if (jsonStr === '[DONE]') continue;
+              
+              const json = JSON.parse(jsonStr);
+              if (json.content && json.content[0] && json.content[0].text) {
+                const text = json.content[0].text;
+                fullText += text;
+                if (onProgress) onProgress(fullText);
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing streaming response:', e);
+        }
+      }
+      
+      return fullText;
     }
-    
-    const data = await response.json();
-    return data.content[0].text;
   } catch (error) {
     console.error('Error in AI chat service:', error);
     throw error;
