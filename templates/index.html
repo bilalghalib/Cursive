@@ -35,7 +35,7 @@
         <div class="toolbar-section content-tools">
             <!-- Content tools -->
             <button id="prompt-btn" title="Get a Writing Prompt"><i class="fas fa-lightbulb"></i> Prompt</button>
-            <button id="new-session-btn" title="Start New Page"><i class="fas fa-file"></i> New</button>
+            <button id="new-session-btn" title="Clear Canvas and Start Fresh"><i class="fas fa-trash-alt"></i> Clear All</button>
         </div>
         
         <div class="toolbar-section app-tools">
@@ -60,25 +60,12 @@
         <canvas id="drawing-canvas"></canvas>
         <div id="text-overlays"></div>
         
-        <!-- Direct Handwriting Chat Button -->
-        <div id="direct-chat-button" title="Write a prompt directly">
-            <i class="fas fa-comment-alt"></i>
-            <span>Chat</span>
-        </div>
-        
-        <!-- Write Prompt Panel -->
-        <div id="write-prompt-panel" class="hidden">
-            <div class="panel-header">
-                <h3>Write your prompt</h3>
-                <button id="close-prompt-panel" class="close-panel-btn"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="panel-content">
-                <canvas id="prompt-canvas"></canvas>
-                <div class="prompt-controls">
-                    <button id="clear-prompt-btn" title="Clear"><i class="fas fa-eraser"></i></button>
-                    <button id="submit-prompt-btn" title="Send to Claude"><i class="fas fa-paper-plane"></i> Send</button>
-                </div>
-            </div>
+        <!-- Quick Actions Toolbar -->
+        <div id="canvas-actions">
+            <button id="stream-to-canvas-btn" title="Stream AI Response Directly to Canvas">
+                <i class="fas fa-magic"></i>
+                <span>Stream AI Text</span>
+            </button>
         </div>
     </div>
     <div id="loading-overlay">
@@ -95,27 +82,13 @@
     <div id="response-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Chat with Claude</h2>
+                <h2>AI Response</h2>
                 <div class="modal-actions">
-                    <button id="etch-to-canvas-btn" title="Add to canvas as handwriting"><i class="fas fa-edit"></i> Etch to Canvas</button>
-                    <button id="continue-chat-btn" title="Continue this conversation"><i class="fas fa-comment"></i> Continue</button>
-                    <button id="new-prompt-btn" title="Start new prompt"><i class="fas fa-plus"></i> New</button>
+                    <button id="etch-to-canvas-btn" title="Stream to Canvas"><i class="fas fa-paint-brush"></i> Stream to Canvas</button>
                     <span class="close" title="Close">&times;</span>
                 </div>
             </div>
             <div id="response-content"></div>
-            <div class="chat-input-container">
-                <div class="input-options">
-                    <button id="type-text-btn" class="input-option-btn active" title="Type text"><i class="fas fa-keyboard"></i></button>
-                    <button id="draw-text-btn" class="input-option-btn" title="Draw response"><i class="fas fa-pen"></i></button>
-                </div>
-                <textarea id="chat-input" placeholder="Ask a follow-up question..." rows="2"></textarea>
-                <div id="chat-drawing-container" class="hidden">
-                    <canvas id="chat-drawing-canvas"></canvas>
-                    <button id="clear-drawing-btn" title="Clear"><i class="fas fa-eraser"></i></button>
-                </div>
-                <button id="send-chat-btn"><i class="fas fa-paper-plane"></i></button>
-            </div>
         </div>
     </div>
     <div id="prompt-modal" class="modal">
@@ -123,6 +96,22 @@
             <span class="close">&times;</span>
             <h2>Random Prompt</h2>
             <p id="prompt-content"></p>
+        </div>
+    </div>
+    
+    <div id="stream-prompt-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Stream AI Text to Canvas</h2>
+                <span class="close" title="Close">&times;</span>
+            </div>
+            <p>What would you like Claude to write directly on your canvas?</p>
+            <textarea id="stream-prompt-input" placeholder="Enter your prompt here..." rows="4"></textarea>
+            <div class="modal-footer">
+                <button id="stream-prompt-submit" class="primary-button">
+                    <i class="fas fa-magic"></i> Stream to Canvas
+                </button>
+            </div>
         </div>
     </div>
     
@@ -140,14 +129,27 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/config.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/dataManager.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/canvasManager.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/aiService.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    <!-- Import version first -->
+    <script type="module">
+        // Load version information first to set up dynamic imports
+        import { VERSION } from "{{ url_for('static', filename='js/version.js') }}?v={{ range(1, 100000) | random }}";
+        window.CURSIVE_VERSION = VERSION;
+        console.log(`Loading Cursive v${VERSION}`);
+    </script>
+    
+    <!-- Use direct script tags with version parameter -->
+    <script type="module" src="{{ url_for('static', filename='js/config.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/dataManager.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/handwritingSimulation.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/canvasManager.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/promptManager.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/aiService.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v={{ range(1, 100000) | random }}"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        // Wait for a small delay to ensure all modules are loaded
+        setTimeout(() => {
             const aboutBtn = document.getElementById('about-btn');
             const promptBtn = document.getElementById('prompt-btn');
             const infoModal = document.getElementById('info-modal');
@@ -173,28 +175,36 @@
                 "What's a new opportunity or silver lining you discovered in the past that you can apply to today's challenges, like a hidden superpower?"
             ];
             
-            aboutBtn.addEventListener('click', () => {
-                console.log('About button clicked');
-                infoModal.style.display = 'block';
-            });
-
-            promptBtn.addEventListener('click', () => {
-                console.log('Prompt button clicked');
-                const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-                document.getElementById('prompt-content').textContent = randomPrompt;
-                promptModal.style.display = 'block';
-            });
-
-            closeBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    console.log('Close button clicked');
-                    const modal = btn.closest('.modal');
-                    if (modal) {
-                        modal.style.display = 'none';
-                    }
+            if (aboutBtn) {
+                aboutBtn.addEventListener('click', () => {
+                    console.log('About button clicked');
+                    if (infoModal) infoModal.style.display = 'block';
                 });
-            });
+            }
 
+            if (promptBtn) {
+                promptBtn.addEventListener('click', () => {
+                    console.log('Prompt button clicked');
+                    const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+                    const promptContent = document.getElementById('prompt-content');
+                    if (promptContent) promptContent.textContent = randomPrompt;
+                    if (promptModal) promptModal.style.display = 'block';
+                });
+            }
+
+            if (closeBtns) {
+                closeBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        console.log('Close button clicked');
+                        const modal = btn.closest('.modal');
+                        if (modal) {
+                            modal.style.display = 'none';
+                        }
+                    });
+                });
+            }
+
+            // Attach global click handler for modals
             window.addEventListener('click', (event) => {
                 if (event.target.classList.contains('modal')) {
                     console.log('Window click to close modal');
@@ -211,7 +221,7 @@
                 }
                 lastTouchEnd = now;
             }, false);
-        });
+        }, 800); // Wait for a bit longer to ensure DOM and modules are fully loaded
     </script>
     <div id="file-drop-zone" style="display: none;">
         <div id="drop-zone-content">

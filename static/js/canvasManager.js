@@ -1120,12 +1120,51 @@ export async function drawHandwritingOnCanvas(text, x, y, maxWidth, options = {}
         ctx.save();
         ctx.setTransform(scale, 0, 0, scale, panX, panY);
         
-        // Render the handwriting
-        await renderHandwritingOnCanvas(ctx, text, x, y, maxWidth, {
+        // Prepare the options for rendering
+        const renderOptions = {
             fontSize: options.fontSize || 20,
             ...style,
-            color
-        });
+            color,
+            // Add new parameters for enhanced handwriting
+            animationDelay: options.animationDelay || false,
+            consistentStyle: options.consistentStyle !== undefined ? options.consistentStyle : true,
+        };
+        
+        // If specified, adjust slant and jitter for more natural variation
+        if (options.slantVariation) {
+            renderOptions.slant = style.slant * (0.8 + Math.random() * 0.4);
+        }
+        
+        if (options.jitterVariation) {
+            renderOptions.jitter = style.jitter * (0.8 + Math.random() * 0.4);
+        }
+        
+        // Store the rendered text and its position so it's remembered for future updates
+        // This uses a consistent ID based on the current timestamp if not provided
+        const handwritingId = options.handwritingId || `hw_${Date.now()}`;
+        
+        // Add to drawings array for persistence
+        if (options.saveToDrawings !== false) {
+            drawings.push({
+                type: 'handwriting',
+                text,
+                x,
+                y,
+                maxWidth,
+                style: styleName,
+                id: handwritingId,
+                timestamp: Date.now()
+            });
+            
+            // Save the updated drawings to local storage
+            await saveDrawings(drawings);
+            
+            // Push to undo stack
+            recordAction();
+        }
+        
+        // Render the handwriting
+        await renderHandwritingOnCanvas(ctx, text, x, y, maxWidth, renderOptions);
         
         ctx.restore();
         
@@ -1136,6 +1175,144 @@ export async function drawHandwritingOnCanvas(text, x, y, maxWidth, options = {}
     } catch (error) {
         console.error('Error drawing handwriting on canvas:', error);
         return false;
+    }
+}
+
+// Stream handwriting directly to canvas with word-by-word updates
+export async function streamHandwritingToCanvas(prompt, x, y, maxWidth, options = {}) {
+    try {
+        // Show loading while preparing
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) loadingOverlay.style.display = 'flex';
+        
+        // Import necessary modules
+        const { handwritingStyles } = await import('./handwritingSimulation.js');
+        const { sendChatToAI } = await import('./aiService.js');
+        
+        // Get theme-based color
+        const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+        const color = isDarkMode ? 
+            getComputedStyle(document.documentElement).getPropertyValue('--ink-color').trim() : 
+            '#000000';
+        
+        // Choose handwriting style
+        const styleName = options.style || 'cursive';
+        const style = handwritingStyles[styleName] || handwritingStyles.cursive;
+        
+        // Create chat history with the prompt
+        const chatHistory = [{ role: 'user', content: prompt }];
+        
+        // Prepare starting options for the handwriting
+        const handwritingId = `stream_${Date.now()}`;
+        let currentText = '';
+        let lastRenderedWordCount = 0;
+        let stabilizationTimer = null;
+        
+        // Create temp drawing to be used during streaming
+        const tempDrawing = {
+            type: 'handwriting',
+            text: '',
+            x,
+            y,
+            maxWidth,
+            style: styleName,
+            id: handwritingId,
+            timestamp: Date.now()
+        };
+        
+        // Add empty drawing to drawing array 
+        drawings.push(tempDrawing);
+        
+        // Record this action for undo history
+        recordAction();
+        
+        // Create a toast notification to show we're streaming
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = 'Streaming AI response...';
+        document.body.appendChild(toast);
+        
+        // Hide loading overlay - we'll see the streaming now
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+        
+        // Setup the streaming progress callback
+        const onProgress = async (text) => {
+            currentText = text;
+            
+            // Count words to see if we have new ones to render
+            const currentWordCount = text.split(' ').length;
+            
+            // Only render if we have new words
+            if (currentWordCount > lastRenderedWordCount) {
+                // Clear any pending render timer
+                if (stabilizationTimer) {
+                    clearTimeout(stabilizationTimer);
+                }
+                
+                // Set a delay to avoid too frequent updates
+                stabilizationTimer = setTimeout(async () => {
+                    // Update this drawing in place
+                    tempDrawing.text = text;
+                    
+                    // Draw the current text state
+                    await drawHandwritingOnCanvas(
+                        text, 
+                        x, 
+                        y, 
+                        maxWidth, 
+                        {
+                            style: styleName,
+                            fontSize: options.fontSize || 20,
+                            animationDelay: false, // No animation during streaming
+                            consistentStyle: true, // Keep consistent style
+                            saveToDrawings: false, // Don't save intermediate versions
+                            handwritingId // Use same ID for updates
+                        }
+                    );
+                    
+                    // Update last rendered count
+                    lastRenderedWordCount = currentWordCount;
+                }, 200); // 200ms delay for smoother updates
+            }
+        };
+        
+        // Start streaming the response
+        const response = await sendChatToAI(chatHistory, onProgress);
+        
+        // Final rendering after streaming completes
+        await drawHandwritingOnCanvas(
+            response, 
+            x, 
+            y, 
+            maxWidth, 
+            {
+                style: styleName,
+                fontSize: options.fontSize || 20,
+                animationDelay: false,
+                consistentStyle: true,
+                saveToDrawings: true, // Save the final version
+                handwritingId // Use same ID
+            }
+        );
+        
+        // Update chat history with the response
+        chatHistory.push({ role: 'assistant', content: response });
+        
+        // Remove toast
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            if (document.body.contains(toast)) {
+                document.body.removeChild(toast);
+            }
+        }, 500);
+        
+        // Return the response
+        return response;
+    } catch (error) {
+        console.error('Error streaming handwriting to canvas:', error);
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+        return null;
     }
 }
 

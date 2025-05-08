@@ -52,10 +52,11 @@ function getVariation(base, percent) {
 }
 
 /**
- * Creates a realistic handwriting simulation SVG
+ * Creates a realistic handwriting simulation SVG with only the specified words
  * @param {string} text - The text to render as handwriting
  * @param {number} width - Maximum width of the resulting SVG
  * @param {Object} options - Customization options
+ * @param {number} [options.wordLimit] - Optional limit to only render up to a certain number of words
  * @returns {string} SVG string representing the handwritten text
  */
 export function simulateHandwriting(text, width, options = {}) {
@@ -68,11 +69,14 @@ export function simulateHandwriting(text, width, options = {}) {
         color: options.color || '#000000',
         slant: options.slant || 0.1, // 0-1 range for italic effect
         connectLetters: options.connectLetters !== undefined ? options.connectLetters : true,
-        jitter: options.jitter !== undefined ? options.jitter : 0.2, // 0-1 range for randomness
+        jitter: options.jitter !== undefined ? options.jitter : 0.15, // Reduced jitter for less scribbling
         thickness: options.thickness || 1.5,
-        thicknessVariation: options.thicknessVariation || 0.4, // 0-1 range
-        baselineVariation: options.baselineVariation || 2, // pixels
-        characterVariation: options.characterVariation || 0.3 // 0-1 range for character shape variation
+        thicknessVariation: options.thicknessVariation || 0.3, // Reduced variation for better consistency
+        baselineVariation: options.baselineVariation || 1.5, // Reduced for more consistent baseline
+        characterVariation: options.characterVariation || 0.2, // Reduced for better legibility
+        wordLimit: options.wordLimit, // Optional limit to only render certain number of words
+        animationDelay: options.animationDelay || false, // Whether to add animation delay
+        consistentStyle: options.consistentStyle !== undefined ? options.consistentStyle : true // Whether to keep consistent style
     };
     
     // Create SVG element
@@ -86,11 +90,31 @@ export function simulateHandwriting(text, width, options = {}) {
     let currentY = settings.fontSize;
     let previousEnd = null; // Track the endpoint of the previous letter for connections
     
+    // Handle empty text
+    if (!text || typeof text !== 'string' || text.trim() === '') {
+        // Just set a minimal SVG
+        svg.setAttribute("height", settings.fontSize + settings.lineHeight);
+        svg.setAttribute("viewBox", `0 0 ${width} ${settings.fontSize + settings.lineHeight}`);
+        return svg.outerHTML;
+    }
+    
     // Split text into words
     const words = text.split(" ");
     
+    // Limit the number of words if wordLimit is specified
+    const wordsToRender = settings.wordLimit ? words.slice(0, settings.wordLimit) : words;
+    
+    // Store consistent character styles if enabled
+    const characterStyles = {};
+    
     // Process each word
-    words.forEach((word, wordIndex) => {
+    wordsToRender.forEach((word, wordIndex) => {
+        if (!word || word.trim() === '') {
+            // Skip empty words
+            currentX += settings.wordSpacing;
+            return;
+        }
+        
         // Check if word fits current line
         const wordWidth = word.length * settings.letterSpacing;
         if (currentX + wordWidth > width - 20) { // 20px padding on right side
@@ -105,16 +129,36 @@ export function simulateHandwriting(text, width, options = {}) {
             const letterType = getLetterType(char);
             
             // Select a template based on letter type with some variation
-            const templateSet = letterTemplates[letterType];
-            const templateIndex = Math.floor(Math.random() * templateSet.length);
-            let pathData = templateSet[templateIndex];
+            // Use consistent style for each unique character if enabled
+            let templateIndex;
+            if (settings.consistentStyle && characterStyles[char] !== undefined) {
+                templateIndex = characterStyles[char].templateIndex;
+            } else {
+                const templateSet = letterTemplates[letterType];
+                // Default to index 0 if the template set exists but is empty
+                templateIndex = templateSet && templateSet.length > 0 ? 
+                    Math.floor(Math.random() * templateSet.length) : 0;
+                
+                // Store the style for this character if consistency is enabled
+                if (settings.consistentStyle) {
+                    characterStyles[char] = { templateIndex };
+                }
+            }
+            
+            const templateSet = letterTemplates[letterType] || letterTemplates.middle;
+            if (!templateSet || templateSet.length === 0) {
+                console.warn(`No template found for letter '${char}' with type '${letterType}', using default`);
+                continue; // Skip this character if no template is available
+            }
+            
+            let pathData = templateSet[templateIndex] || templateSet[0];
             
             // Apply character variation - slightly modify the path data
             if (Math.random() < settings.characterVariation) {
                 // Modify the path data by tweaking the numbers slightly
                 pathData = pathData.replace(/(\d+(\.\d+)?)/g, (match) => {
                     const num = parseFloat(match);
-                    const variation = num * 0.2; // 20% variation
+                    const variation = num * 0.15; // 15% variation (reduced from 20%)
                     return (num + (Math.random() * variation * 2) - variation).toFixed(1);
                 });
             }
@@ -149,6 +193,20 @@ export function simulateHandwriting(text, width, options = {}) {
             path.setAttribute("stroke-linecap", "round");
             path.setAttribute("stroke-linejoin", "round");
             
+            // Add animation if enabled
+            if (settings.animationDelay) {
+                // Calculate delay based on character position
+                const totalChars = wordsToRender.reduce((acc, w) => acc + w.length, 0);
+                const charIndex = wordsToRender.slice(0, wordIndex).reduce((acc, w) => acc + w.length, 0) + i;
+                const delay = (charIndex / totalChars) * 2; // Max 2 second delay for last character
+                
+                // Add animation to stroke-dasharray to create a writing effect
+                const pathLength = 100; // Arbitrary path length
+                path.setAttribute("stroke-dasharray", pathLength);
+                path.setAttribute("stroke-dashoffset", pathLength);
+                path.setAttribute("style", `animation: drawPath 0.5s ease forwards ${delay}s;`);
+            }
+            
             // Add the path to the SVG
             svg.appendChild(path);
             
@@ -167,6 +225,18 @@ export function simulateHandwriting(text, width, options = {}) {
                 connector.setAttribute("stroke", settings.color);
                 connector.setAttribute("fill", "none");
                 connector.setAttribute("stroke-width", strokeWidth * 0.7); // Slightly thinner
+                
+                // Add animation to connectors if enabled
+                if (settings.animationDelay) {
+                    const totalChars = wordsToRender.reduce((acc, w) => acc + w.length, 0);
+                    const charIndex = wordsToRender.slice(0, wordIndex).reduce((acc, w) => acc + w.length, 0) + i;
+                    const delay = (charIndex / totalChars) * 2 - 0.05; // Slight offset from the character
+                    
+                    const pathLength = 100;
+                    connector.setAttribute("stroke-dasharray", pathLength);
+                    connector.setAttribute("stroke-dashoffset", pathLength);
+                    connector.setAttribute("style", `animation: drawPath 0.3s ease forwards ${delay}s;`);
+                }
                 
                 svg.appendChild(connector);
             }
@@ -193,6 +263,19 @@ export function simulateHandwriting(text, width, options = {}) {
     // Set the final SVG height based on the content
     svg.setAttribute("height", currentY + settings.lineHeight);
     svg.setAttribute("viewBox", `0 0 ${width} ${currentY + settings.lineHeight}`);
+    
+    // Add animation styles if animation is enabled
+    if (settings.animationDelay) {
+        const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+        style.textContent = `
+            @keyframes drawPath {
+                to {
+                    stroke-dashoffset: 0;
+                }
+            }
+        `;
+        svg.appendChild(style);
+    }
     
     return svg.outerHTML;
 }

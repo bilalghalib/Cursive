@@ -5,6 +5,8 @@ import anthropic
 import logging
 import uuid
 import json
+import time
+import re
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -147,8 +149,13 @@ def serve_page(page_id=None):
                 page_data = json.load(f)
         else:
             page_data = None
-            
-        return render_template('index.html', page_id=page_id, page_data=page_data)
+        
+        response = make_response(render_template('index.html', page_id=page_id, page_data=page_data))
+        # Disable caching for main page
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except Exception as e:
         logging.error(f"Error serving page {page_id}: {str(e)}")
         return f"Error loading page: {str(e)}", 500
@@ -156,12 +163,79 @@ def serve_page(page_id=None):
 # Serve other static files
 @app.route('/<path:path>')
 def serve_static_file(path):
-    return send_from_directory(app.static_folder, path)
+    response = send_from_directory(app.static_folder, path)
+    # Disable caching for all static files
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/static/config/config.yaml')
 def serve_config():
-    return send_from_directory(os.path.join(base_dir, 'static', 'config'), 'config.yaml')
+    response = send_from_directory(os.path.join(base_dir, 'static', 'config'), 'config.yaml')
+    # Disable caching for config file
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+# Update version.js file to force cache refresh
+def update_version_file():
+    version_file_path = os.path.join(base_dir, 'static', 'js', 'version.js')
+    try:
+        # If file exists, read and update the version number
+        if os.path.exists(version_file_path):
+            with open(version_file_path, 'r') as f:
+                content = f.read()
+                # Find the version string using regex
+                version_match = re.search(r'export const VERSION = [\'"](\d+\.\d+\.\d+)[\'"]', content)
+                if version_match:
+                    version_parts = version_match.group(1).split('.')
+                    # Increment the patch version
+                    version_parts[2] = str(int(version_parts[2]) + 1)
+                    new_version = '.'.join(version_parts)
+                    # Replace the version in the file
+                    new_content = re.sub(
+                        r'export const VERSION = [\'"](\d+\.\d+\.\d+)[\'"]', 
+                        f'export const VERSION = \'{new_version}\'', 
+                        content
+                    )
+                    logging.info(f"Updating version to {new_version}")
+                else:
+                    # If version not found, use a timestamp
+                    timestamp = int(time.time())
+                    new_version = f"1.0.{timestamp}"
+                    new_content = f'// Version information to force cache refresh\n' \
+                                f'export const VERSION = \'{new_version}\'; // Increment this when making updates\n\n' \
+                                f'// Force cache refresh by adding ?v=VERSION to import URLs\n' \
+                                f'export function getVersionedPath(path) {{\n' \
+                                f'    return `${{path}}?v=${{VERSION}}`;\n' \
+                                f'}}'
+                    logging.info(f"Creating new version file with version {new_version}")
+        else:
+            # If file doesn't exist, create it with a timestamp-based version
+            timestamp = int(time.time())
+            new_version = f"1.0.{timestamp}"
+            new_content = f'// Version information to force cache refresh\n' \
+                        f'export const VERSION = \'{new_version}\'; // Increment this when making updates\n\n' \
+                        f'// Force cache refresh by adding ?v=VERSION to import URLs\n' \
+                        f'export function getVersionedPath(path) {{\n' \
+                        f'    return `${{path}}?v=${{VERSION}}`;\n' \
+                        f'}}'
+            logging.info(f"Creating new version file with version {new_version}")
+        
+        # Write the updated content back to the file
+        with open(version_file_path, 'w') as f:
+            f.write(new_content)
+            
+        return new_version
+    except Exception as e:
+        logging.error(f"Error updating version file: {str(e)}")
+        return "1.0.0"
 
 if __name__ == '__main__':
+    # Update version file on each start to force cache refresh
+    new_version = update_version_file()
+    logging.info(f"Starting Cursive server with version {new_version}")
     app.run(host='0.0.0.0', port=5022, debug=True)
     

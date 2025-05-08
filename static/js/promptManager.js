@@ -299,10 +299,27 @@ function parseAIResponse(response) {
 // Function to toggle the write prompt panel
 export function toggleWritePromptPanel() {
     const writePromptPanel = document.getElementById('write-prompt-panel');
+    
+    if (!writePromptPanel) {
+        console.error("Write prompt panel not found in the DOM");
+        return;
+    }
+    
+    // Toggle the hidden class
     writePromptPanel.classList.toggle('hidden');
     
-    // If panel is now visible, resize canvas to fit
+    // If panel is now visible, initialize canvas and resize to fit
     if (!writePromptPanel.classList.contains('hidden')) {
-        resizePromptCanvas();
+        // Initialize the canvas if it hasn't been yet
+        if (!promptCanvas) {
+            initPromptCanvas();
+        }
+        
+        // Resize the canvas to fit the container
+        setTimeout(() => {
+            resizePromptCanvas();
+        }, 50); // Short delay to ensure the panel is fully visible
     }
+    
+    console.log("Write prompt panel toggled:", !writePromptPanel.classList.contains('hidden'));
 }

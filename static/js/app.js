@@ -98,6 +98,9 @@ function setupEventListeners() {
     const themeToggleBtn = document.getElementById('theme-toggle');
     const pdfExportBtn = document.getElementById('pdf-export-btn');
     
+    // Direct AI streaming to canvas
+    const streamToCanvasBtn = document.getElementById('stream-to-canvas-btn');
+    
     // Direct handwriting prompt elements
     const directChatButton = document.getElementById('direct-chat-button');
     const writePromptPanel = document.getElementById('write-prompt-panel');
@@ -182,6 +185,11 @@ function setupEventListeners() {
     // Etch to canvas button handler
     if (etchToCanvasBtn) {
         etchToCanvasBtn.addEventListener('click', handleEtchToCanvas);
+    }
+    
+    // Stream AI text directly to canvas handler
+    if (streamToCanvasBtn) {
+        streamToCanvasBtn.addEventListener('click', handleStreamToCanvas);
     }
     
     // Initialize theme based on user preference or system setting
@@ -335,25 +343,89 @@ async function handleTranscriptionResponse(transcription) {
         const modal = document.getElementById('response-modal');
         const content = document.getElementById('response-content');
         
-        // Show the modal with loading indicator
-        content.innerHTML = `
-            <p><strong>Transcription:</strong> ${transcription}</p>
-            <p><strong>AI is thinking...</strong> <span class="typing-indicator">...</span></p>
-        `;
+        // Clear previous content and add heading
+        content.innerHTML = '';
+        
+        // Add user message to display
+        const userMessageElement = document.createElement('div');
+        userMessageElement.classList.add('chat-message', 'user-message');
+        userMessageElement.innerHTML = `<strong>You wrote:</strong> ${transcription}`;
+        content.appendChild(userMessageElement);
+        
+        // Add typing indicator
+        const typingElement = document.createElement('div');
+        typingElement.classList.add('chat-message', 'ai-message', 'typing');
+        typingElement.innerHTML = `<strong>Claude:</strong> <span class="typing-indicator">...</span>`;
+        content.appendChild(typingElement);
+        
+        // Show the modal
         modal.style.display = 'block';
         
-        // Setup streaming response handler
+        // Setup streaming response handler with word-by-word rendering
         let responseText = '';
+        let lastWordCount = 0;
+        let stabilizationTimer = null;
+        
+        // Create a handwriting container once
+        typingElement.innerHTML = `<strong>Claude:</strong>`;
+        const handwritingContainer = document.createElement('div');
+        handwritingContainer.className = 'handwriting-container';
+        handwritingContainer.id = 'streaming-handwriting-container-selection';
+        typingElement.appendChild(handwritingContainer);
+        
+        // Choose a suitable handwriting style - use cursive for selections from canvas
+        const styleName = 'cursive';
+        const style = handwritingStyles[styleName];
+        
+        // Store style settings for reuse
+        const handwritingSettings = {
+            width: content.offsetWidth - 60, // Account for padding
+            fontSize: 20,
+            ...style,
+            color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim(),
+            consistentStyle: true // Keep character styles consistent
+        };
+        
+        // Save original handwriting style for the whole response
+        const initialStyle = { ...handwritingSettings };
+        
+        // Function to handle streamed text updates
         const onProgress = (text) => {
             responseText = text;
-            content.innerHTML = `
-                <p><strong>Transcription:</strong> ${transcription}</p>
-                <p><strong>AI:</strong> ${text}</p>
-            `;
+            
+            // Count words to see if we have new ones to render
+            const currentWordCount = text.split(" ").length;
+            
+            // Only re-render if we have new words
+            if (currentWordCount > lastWordCount) {
+                // Clear any pending render timer
+                if (stabilizationTimer) {
+                    clearTimeout(stabilizationTimer);
+                }
+                
+                // Set a short delay before rendering to avoid too many renders when words come quickly
+                stabilizationTimer = setTimeout(() => {
+                    // Render the handwriting with only the words we have so far
+                    renderHandwriting(handwritingContainer, text, {
+                        ...initialStyle,
+                        // If this is the "final" render (hasn't changed in 300ms), add animation effect 
+                        animationDelay: currentWordCount > 30 && Math.random() > 0.8
+                    });
+                    
+                    lastWordCount = currentWordCount;
+                    content.scrollTop = content.scrollHeight;
+                }, 300); // 300ms delay to stabilize fast word streaming
+            }
         };
         
         // Send the request with streaming enabled
         const chatResponse = await sendChatToAI(currentChatHistory, onProgress);
+        
+        // Final render with complete text - make sure we got everything
+        renderHandwriting(handwritingContainer, chatResponse, {
+            ...initialStyle
+        });
+        
         debugLog('Chat response:', chatResponse);
         
         return chatResponse;
@@ -393,18 +465,50 @@ function displayFullResponse(item) {
 }
 
 async function startNewSession() {
+    // Show loading overlay
+    showLoading();
     
-    clearCanvas();
-    await clearNotebook();
-    notebookItems = [];
-    currentChatHistory = [];
-    await saveDrawings([]);
-    debugLog('New session started. Canvas, local storage, and chat history cleared.');
-    redrawCanvas();
-    refreshCanvas();
-    
-    // Change the URL to the root state
-    window.history.pushState({}, '', '/');
+    try {
+        // Clear the canvas first (this is visual so user gets immediate feedback)
+        clearCanvas();
+        
+        // Clear notebook items in storage
+        await clearNotebook();
+        
+        // Reset in-memory data
+        notebookItems = [];
+        currentChatHistory = [];
+        
+        // Clear drawings from storage
+        await saveDrawings([]);
+        
+        // Log for debugging
+        debugLog('Canvas cleared. All drawings and conversations have been removed.');
+        
+        // Redraw the clean canvas
+        redrawCanvas();
+        refreshCanvas();
+        
+        // Change the URL to the root state
+        window.history.pushState({}, '', '/');
+        
+        // Show brief success message
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = 'Canvas cleared';
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(toast);
+            }, 300);
+        }, 1000);
+    } catch (error) {
+        console.error('Error clearing canvas:', error);
+    } finally {
+        hideLoading();
+    }
 }
 
 function initDebugConsole() {
@@ -507,6 +611,28 @@ async function handlePdfExport() {
             const pageWidth = pdf.internal.pageSize.getWidth();
             const textWidth = pageWidth - (margin * 2);
             
+            // Load all text overlays from the DOM
+            const textOverlays = document.querySelectorAll('.text-bubble');
+            const overlaysInfo = Array.from(textOverlays).map(bubble => {
+                // Get content and role from bubble
+                const isUser = bubble.classList.contains('user-text');
+                const content = bubble.querySelector('.content')?.textContent || '';
+                const id = bubble.id || '';
+                return { isUser, content, id };
+            });
+            
+            // Create a map to match notebook items with their overlays
+            const bubbleIdMap = {};
+            overlaysInfo.forEach(overlay => {
+                if (overlay.id) {
+                    const itemId = overlay.id.replace('user-text-', '').replace('ai-text-', '');
+                    if (!bubbleIdMap[itemId]) {
+                        bubbleIdMap[itemId] = [];
+                    }
+                    bubbleIdMap[itemId].push(overlay);
+                }
+            });
+            
             // Add each conversation
             for (let i = 0; i < notebookItems.length; i++) {
                 const item = notebookItems[i];
@@ -527,7 +653,16 @@ async function handlePdfExport() {
                 pdf.text(`You wrote:`, margin, yPos);
                 yPos += 20;
                 
-                const userTextLines = pdf.splitTextToSize(item.transcription, textWidth);
+                // Get user text from the notebook item or overlay
+                let userText = item.transcription;
+                // If the overlay has different content, use that (it might have been edited)
+                const overlays = bubbleIdMap[item.id] || [];
+                const userOverlay = overlays.find(o => o.isUser);
+                if (userOverlay && userOverlay.content && userOverlay.content !== item.transcription) {
+                    userText = userOverlay.content;
+                }
+                
+                const userTextLines = pdf.splitTextToSize(userText, textWidth);
                 pdf.text(userTextLines, margin, yPos);
                 yPos += userTextLines.length * 15 + 10;
                 
@@ -539,7 +674,14 @@ async function handlePdfExport() {
                         pdf.text(`Claude:`, margin, yPos);
                         yPos += 20;
                         
-                        const aiTextLines = pdf.splitTextToSize(lastAIMessage.content, textWidth);
+                        // Get AI text from chat history or overlay
+                        let aiText = lastAIMessage.content;
+                        const aiOverlay = overlays.find(o => !o.isUser);
+                        if (aiOverlay && aiOverlay.content && aiOverlay.content !== lastAIMessage.content) {
+                            aiText = aiOverlay.content;
+                        }
+                        
+                        const aiTextLines = pdf.splitTextToSize(aiText, textWidth);
                         pdf.text(aiTextLines, margin, yPos);
                         yPos += aiTextLines.length * 15 + 30;
                     }
@@ -550,6 +692,64 @@ async function handlePdfExport() {
                     pdf.setDrawColor(200, 200, 200);
                     pdf.line(margin, yPos - 10, pageWidth - margin, yPos - 10);
                     yPos += 20;
+                }
+            }
+            
+            // Also add direct chat conversations that might not be part of notebook items
+            const directChats = notebookItems.filter(item => item.isDirectChat);
+            if (directChats.length > 0) {
+                // Add a section for direct chats if there are any
+                pdf.addPage();
+                
+                // Add title for direct chats
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('Direct Chat Conversations', 40, 40);
+                
+                yPos = 80;
+                
+                // Process each direct chat
+                for (let i = 0; i < directChats.length; i++) {
+                    const chat = directChats[i];
+                    
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(`Direct Chat ${i+1}:`, margin, yPos);
+                    yPos += 25;
+                    
+                    // Add each message in the conversation
+                    if (chat.chatHistory && chat.chatHistory.length > 0) {
+                        for (const message of chat.chatHistory) {
+                            // Check if we need a new page
+                            if (yPos > pdf.internal.pageSize.getHeight() - 100) {
+                                pdf.addPage();
+                                yPos = 80;
+                            }
+                            
+                            if (message.role === 'user') {
+                                pdf.setFont('helvetica', 'normal');
+                                pdf.text(`You:`, margin, yPos);
+                                yPos += 20;
+                                
+                                const textLines = pdf.splitTextToSize(message.content, textWidth);
+                                pdf.text(textLines, margin, yPos);
+                                yPos += textLines.length * 15 + 15;
+                            } else if (message.role === 'assistant') {
+                                pdf.setFont('helvetica', 'italic');
+                                pdf.text(`Claude:`, margin, yPos);
+                                yPos += 20;
+                                
+                                const textLines = pdf.splitTextToSize(message.content, textWidth);
+                                pdf.text(textLines, margin, yPos);
+                                yPos += textLines.length * 15 + 25;
+                            }
+                        }
+                    }
+                    
+                    // Add separator between conversations
+                    if (i < directChats.length - 1) {
+                        pdf.setDrawColor(200, 200, 200);
+                        pdf.line(margin, yPos - 10, pageWidth - margin, yPos - 10);
+                        yPos += 30;
+                    }
                 }
             }
         }
@@ -662,11 +862,29 @@ function handleImport() {
     dropZone.style.display = 'flex';
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
-} else {
-    initApp();
+// Wait for a short delay to ensure all modules are loaded
+function safeInitApp() {
+    // Force a small delay to ensure DOM is fully loaded and all modules are available
+    setTimeout(() => {
+        console.log("Initializing Cursive app...");
+        initApp();
+    }, 500);
 }
+
+// Initialize the app when the DOM is loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', safeInitApp);
+} else {
+    safeInitApp();
+}
+
+// Also listen for window load event as a backup
+window.addEventListener('load', () => {
+    if (!isAppInitialized) {
+        console.log("Initializing app on window load...");
+        initApp();
+    }
+});
 
 
 function showSaveToWebModal(url) {
@@ -940,37 +1158,90 @@ async function handleTypedChatInput(text) {
         // Scroll to bottom of content
         content.scrollTop = content.scrollHeight;
         
-        // Setup streaming response handler
+        // Setup variables for streaming response
         let responseText = '';
+        let lastWordCount = 0;
+        let stabilizationTimer = null;
+        
+        // Create a handwriting container once
+        typingElement.innerHTML = `<strong>Claude:</strong>`;
+        const handwritingContainer = document.createElement('div');
+        handwritingContainer.className = 'handwriting-container';
+        handwritingContainer.id = 'streaming-handwriting-container';
+        typingElement.appendChild(handwritingContainer);
+        
+        // Get a random handwriting style but with some preferences
+        let styleName;
+        const styleRandom = Math.random();
+        if (styleRandom < 0.4) {
+            styleName = 'cursive'; // 40% chance for cursive
+        } else if (styleRandom < 0.7) {
+            styleName = 'neat'; // 30% chance for neat
+        } else if (styleRandom < 0.9) {
+            styleName = 'print'; // 20% chance for print
+        } else {
+            styleName = 'messy'; // 10% chance for messy
+        }
+        
+        const style = handwritingStyles[styleName];
+        
+        // Store style settings for reuse
+        const handwritingSettings = {
+            width: content.offsetWidth - 60, // Account for padding
+            fontSize: 20,
+            ...style,
+            color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim(),
+            consistentStyle: true // Keep character styles consistent
+        };
+        
+        // Save original handwriting style for the whole response
+        const initialStyle = { ...handwritingSettings };
+        
+        // Function to handle streamed text updates
         const onProgress = (text) => {
             responseText = text;
             
-            // Use our new handwriting simulation for AI responses
-            typingElement.innerHTML = `<strong>Claude:</strong>`;
+            // Count words to see if we have new ones to render
+            const currentWordCount = text.split(" ").length;
             
-            // Create a handwriting container div
-            const handwritingContainer = document.createElement('div');
-            handwritingContainer.className = 'handwriting-container';
-            
-            // Get a random handwriting style with a preference for cursive or neat
-            const styleNames = Object.keys(handwritingStyles);
-            const styleName = Math.random() > 0.5 ? 'cursive' : 'neat';
-            const style = handwritingStyles[styleName];
-            
-            // Render the handwriting
-            renderHandwriting(handwritingContainer, text, {
-                width: content.offsetWidth - 60, // Account for padding
-                fontSize: 20,
-                ...style,
-                color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim()
-            });
-            
-            typingElement.appendChild(handwritingContainer);
-            content.scrollTop = content.scrollHeight;
+            // Only re-render if we have new words
+            if (currentWordCount > lastWordCount) {
+                // Clear any pending render timer
+                if (stabilizationTimer) {
+                    clearTimeout(stabilizationTimer);
+                }
+                
+                // Set a short delay before rendering to avoid too many renders when words come quickly
+                stabilizationTimer = setTimeout(() => {
+                    // Make sure the handwriting container is properly positioned
+                    handwritingContainer.style.position = 'relative';
+                    handwritingContainer.style.left = '0';
+                    handwritingContainer.style.top = '0';
+                    handwritingContainer.style.margin = '10px 0';
+                    handwritingContainer.style.width = '100%';
+                    
+                    // Ensure we're using the same style throughout the response
+                    // Render the handwriting with only the words we have so far
+                    renderHandwriting(handwritingContainer, text, {
+                        ...initialStyle,
+                        width: Math.min(content.offsetWidth - 80, 600), // Constrain width for better readability
+                        // If this is the "final" render (hasn't changed in 300ms), add animation effect
+                        animationDelay: currentWordCount > 30 && Math.random() > 0.8
+                    });
+                    
+                    lastWordCount = currentWordCount;
+                    content.scrollTop = content.scrollHeight;
+                }, 300); // 300ms delay to stabilize fast word streaming
+            }
         };
         
         // Send the request with streaming enabled
         const chatResponse = await sendChatToAI(currentChatHistory, onProgress);
+        
+        // Final render with complete text - make sure we got everything
+        renderHandwriting(handwritingContainer, chatResponse, {
+            ...initialStyle
+        });
         
         // Update chat history with AI response
         currentChatHistory.push({ role: 'assistant', content: chatResponse });
@@ -982,7 +1253,8 @@ async function handleTypedChatInput(text) {
             transcription: text,
             tags: ['chat', 'typed'],
             chatHistory: [...currentChatHistory],
-            isDirectChat: true
+            isDirectChat: true,
+            handwritingStyle: styleName // Track the handwriting style used
         };
         
         // Save to notebook
@@ -1087,35 +1359,100 @@ async function handleDrawnChatInput(imageData) {
         // Add to chat history
         currentChatHistory.push({ role: 'user', content: transcription });
         
-        // Setup streaming response handler
+        // Setup streaming response handler with word-by-word rendering
         let responseText = '';
+        let lastWordCount = 0;
+        let stabilizationTimer = null;
+        
+        // Create a handwriting container once
+        typingElement.innerHTML = `<strong>Claude:</strong>`;
+        const handwritingContainer = document.createElement('div');
+        handwritingContainer.className = 'handwriting-container';
+        handwritingContainer.id = 'streaming-handwriting-container-drawn';
+        typingElement.appendChild(handwritingContainer);
+        
+        // Analyze the handwriting style from the user's input and pick a similar style
+        // This makes it appear like Claude is matching the user's writing style
+        let userWritingStyle = 'messy'; // Default to messy for handwritten input
+        
+        // If the tags contain style hints, use them to select a handwriting style
+        const styleHints = {
+            neat: ['neat', 'clean', 'tidy', 'organized', 'legible'],
+            cursive: ['cursive', 'flowing', 'connected', 'elegant', 'script'],
+            print: ['print', 'block', 'capitals', 'clear', 'simple'],
+            messy: ['messy', 'rushed', 'scrawl', 'quick', 'hasty', 'scribble']
+        };
+        
+        // Check if any of the tags match our style hints
+        for (const [style, hints] of Object.entries(styleHints)) {
+            if (tags.some(tag => hints.includes(tag.toLowerCase()))) {
+                userWritingStyle = style;
+                break;
+            }
+        }
+        
+        // Get the selected style
+        const style = handwritingStyles[userWritingStyle];
+        
+        // Store style settings for reuse
+        const handwritingSettings = {
+            width: content.offsetWidth - 60, // Account for padding
+            fontSize: 20,
+            ...style,
+            color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim(),
+            consistentStyle: true, // Keep character styles consistent
+            // Adjust slant and jitter to simulate user style adaptation
+            slant: style.slant * (0.8 + Math.random() * 0.4), // Vary slant slightly
+            jitter: style.jitter * (0.8 + Math.random() * 0.4) // Vary jitter slightly
+        };
+        
+        // Save original handwriting style for the whole response
+        const initialStyle = { ...handwritingSettings };
+        
+        // Function to handle streamed text updates
         const onProgress = (text) => {
             responseText = text;
             
-            // Use our new handwriting simulation for AI responses
-            typingElement.innerHTML = `<strong>Claude:</strong>`;
+            // Count words to see if we have new ones to render
+            const currentWordCount = text.split(" ").length;
             
-            // Create a handwriting container div
-            const handwritingContainer = document.createElement('div');
-            handwritingContainer.className = 'handwriting-container';
-            
-            // Use the "messy" style for more character
-            const style = handwritingStyles.messy;
-            
-            // Render the handwriting
-            renderHandwriting(handwritingContainer, text, {
-                width: content.offsetWidth - 60, // Account for padding
-                fontSize: 20,
-                ...style,
-                color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim()
-            });
-            
-            typingElement.appendChild(handwritingContainer);
-            content.scrollTop = content.scrollHeight;
+            // Only re-render if we have new words
+            if (currentWordCount > lastWordCount) {
+                // Clear any pending render timer
+                if (stabilizationTimer) {
+                    clearTimeout(stabilizationTimer);
+                }
+                
+                // Set a short delay before rendering to avoid too many renders when words come quickly
+                stabilizationTimer = setTimeout(() => {
+                    // Make sure the handwriting container is properly positioned
+                    handwritingContainer.style.position = 'relative';
+                    handwritingContainer.style.left = '0';
+                    handwritingContainer.style.top = '0';
+                    handwritingContainer.style.margin = '10px 0';
+                    handwritingContainer.style.width = '100%';
+
+                    // Render the handwriting with only the words we have so far
+                    renderHandwriting(handwritingContainer, text, {
+                        ...initialStyle,
+                        width: Math.min(content.offsetWidth - 80, 600), // Constrain width for better readability
+                        // If this is the "final" render (hasn't changed in 300ms), add animation effect
+                        animationDelay: currentWordCount > 30 && Math.random() > 0.8
+                    });
+                    
+                    lastWordCount = currentWordCount;
+                    content.scrollTop = content.scrollHeight;
+                }, 250); // Slightly shorter delay for handwritten input
+            }
         };
         
         // Send to Claude with streaming
         const chatResponse = await sendChatToAI(currentChatHistory, onProgress);
+        
+        // Final render with complete text - make sure we got everything
+        renderHandwriting(handwritingContainer, chatResponse, {
+            ...initialStyle
+        });
         
         // Update chat history
         currentChatHistory.push({ role: 'assistant', content: chatResponse });
@@ -1128,7 +1465,8 @@ async function handleDrawnChatInput(imageData) {
             tags: tags,
             chatHistory: [...currentChatHistory],
             isDirectChat: true,
-            handwritingImage: imageData
+            handwritingImage: imageData,
+            handwritingStyle: userWritingStyle // Track the handwriting style used
         };
         
         // Save to notebook
@@ -1171,13 +1509,52 @@ async function handleEtchToCanvas() {
         const centerX = canvas.width / 3;  // Offset from center for better positioning
         const centerY = canvas.height / 3;
         
-        // Draw the handwriting on the canvas - adjust position based on current view
+        // Find the current displayed handwriting style
+        let currentStyle = 'cursive'; // Default 
+        
+        // Try to find the style from the current handwriting container if possible
+        const handwritingContainer = document.querySelector('.handwriting-container');
+        if (handwritingContainer && handwritingContainer.id) {
+            // Extract style info from the container ID or data attributes if available
+            const containerId = handwritingContainer.id;
+            
+            // Find the most recent notebookItem with a handwritingStyle
+            const recentItems = notebookItems.slice().reverse();
+            const recentItemWithStyle = recentItems.find(item => item.handwritingStyle);
+            
+            if (recentItemWithStyle) {
+                currentStyle = recentItemWithStyle.handwritingStyle;
+            } else {
+                // Check for drawn vs typed containers to set appropriate style
+                if (containerId.includes('drawn')) {
+                    currentStyle = 'messy';
+                } else if (containerId.includes('selection')) {
+                    currentStyle = 'cursive';
+                } else {
+                    // Random select a style with preference for cursive
+                    const styleRandom = Math.random();
+                    if (styleRandom < 0.5) {
+                        currentStyle = 'cursive';
+                    } else if (styleRandom < 0.8) {
+                        currentStyle = 'neat';
+                    } else {
+                        currentStyle = 'print';
+                    }
+                }
+            }
+        }
+        
+        // Draw the handwriting on the canvas with animation - adjust position based on current view
         await drawHandwritingOnCanvas(
             lastAIMessage.content,
             centerX / scale - panX / scale, // Convert to canvas coordinates
             centerY / scale - panY / scale,
             600, // Max width
-            { style: 'cursive' }
+            { 
+                style: currentStyle,
+                animationDelay: true, // Use animation for etching to canvas
+                consistentStyle: true
+            }
         );
         
         // Create an animation to highlight the new text
@@ -1218,9 +1595,185 @@ async function handleEtchToCanvas() {
             }, 500);
         }, 2000);
         
+        // Update notebook item with etch information
+        try {
+            // Find the most recent notebook item (likely the current conversation)
+            if (notebookItems.length > 0) {
+                const latestItem = notebookItems[notebookItems.length - 1];
+                // Add a flag that this has been etched to canvas
+                latestItem.etchedToCanvas = true;
+                latestItem.etchedStyle = currentStyle;
+                await saveNotebookItem(latestItem);
+            }
+        } catch (e) {
+            console.error('Error updating notebook item with etch info:', e);
+            // Non-critical error, don't show to user
+        }
+        
     } catch (error) {
         console.error('Error etching to canvas:', error);
         alert('Error adding response to canvas. Please try again.');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Handle streaming AI text directly to canvas
+async function handleStreamToCanvas() {
+    try {
+        // Show the stream prompt modal
+        const streamPromptModal = document.getElementById('stream-prompt-modal');
+        const streamPromptInput = document.getElementById('stream-prompt-input');
+        const streamPromptSubmit = document.getElementById('stream-prompt-submit');
+        
+        if (!streamPromptModal || !streamPromptInput || !streamPromptSubmit) {
+            console.error('Missing modal elements for stream prompt');
+            return;
+        }
+        
+        // Clear previous input
+        streamPromptInput.value = '';
+        
+        // Show the modal
+        streamPromptModal.style.display = 'block';
+        
+        // Focus the input
+        setTimeout(() => {
+            streamPromptInput.focus();
+        }, 100);
+        
+        // Handle submit action with a Promise
+        const promptPromise = new Promise((resolve) => {
+            // Handle submit button click
+            const submitHandler = () => {
+                const prompt = streamPromptInput.value.trim();
+                if (prompt) {
+                    streamPromptModal.style.display = 'none';
+                    resolve(prompt);
+                } else {
+                    // Highlight empty input
+                    streamPromptInput.classList.add('error');
+                    setTimeout(() => {
+                        streamPromptInput.classList.remove('error');
+                    }, 500);
+                }
+            };
+            
+            // Handle close button and clicks outside modal
+            const closeHandler = (e) => {
+                if (e.target === streamPromptModal || e.target.classList.contains('close')) {
+                    streamPromptModal.style.display = 'none';
+                    resolve(null); // User cancelled
+                }
+            };
+            
+            // Handle Enter key in textarea
+            const keyHandler = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submitHandler();
+                } else if (e.key === 'Escape') {
+                    streamPromptModal.style.display = 'none';
+                    resolve(null); // User cancelled
+                }
+            };
+            
+            // Attach event listeners
+            streamPromptSubmit.addEventListener('click', submitHandler, { once: true });
+            streamPromptModal.addEventListener('click', closeHandler, { once: true });
+            streamPromptInput.addEventListener('keydown', keyHandler);
+            
+            // Clean up event listeners when promise resolves
+            Promise.resolve().then(() => {
+                // Keep the listeners until the modal is closed
+                const cleanup = () => {
+                    streamPromptSubmit.removeEventListener('click', submitHandler);
+                    streamPromptModal.removeEventListener('click', closeHandler);
+                    streamPromptInput.removeEventListener('keydown', keyHandler);
+                };
+                
+                // Set up a mutation observer to detect when modal is hidden
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.attributeName === 'style' && 
+                            streamPromptModal.style.display === 'none') {
+                            cleanup();
+                            observer.disconnect();
+                        }
+                    });
+                });
+                
+                observer.observe(streamPromptModal, { attributes: true });
+            });
+        });
+        
+        // Wait for the user input
+        const prompt = await promptPromise;
+        
+        // If user cancelled, return
+        if (!prompt) return;
+        
+        // Import the canvasManager function for streaming handwriting
+        const { streamHandwritingToCanvas } = await import('./canvasManager.js');
+        
+        // Show loading while preparing
+        showLoading();
+        
+        // Get canvas dimensions and calculate a good starting position
+        const canvas = document.getElementById('drawing-canvas');
+        const centerX = canvas.width / 3; // Position at 1/3 of canvas width 
+        const centerY = canvas.height / 3; // Position at 1/3 of canvas height
+        
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = 'Streaming AI response to canvas...';
+        document.body.appendChild(toast);
+        
+        // Stream the response directly to canvas
+        // The streamHandwritingToCanvas function handles all the streaming
+        const response = await streamHandwritingToCanvas(
+            prompt,
+            centerX / scale - panX / scale, // Convert to canvas coordinates
+            centerY / scale - panY / scale,
+            600, // Max width
+            { 
+                style: 'cursive', // Use cursive style
+                fontSize: 24, // Slightly larger font
+                animationDelay: false, // No animation during streaming
+                consistentStyle: true // Keep consistent style
+            }
+        );
+        
+        // Update toast to show completion
+        toast.textContent = 'AI text added to canvas';
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(toast);
+            }, 500);
+        }, 2000);
+        
+        // Create a notebook item to track this direct interaction
+        const notebookItem = {
+            id: Date.now().toString(),
+            selectionBox: { x: 0, y: 0, width: 100, height: 50 }, // Arbitrary values
+            transcription: prompt,
+            tags: ['direct-streaming'],
+            chatHistory: [
+                { role: 'user', content: prompt },
+                { role: 'assistant', content: response }
+            ],
+            isDirectChat: true,
+            handwritingStyle: 'cursive'
+        };
+        
+        // Save to notebook
+        await saveNotebookItem(notebookItem);
+        
+    } catch (error) {
+        console.error('Error streaming to canvas:', error);
+        alert('Error streaming AI text to canvas. Please try again.');
     } finally {
         hideLoading();
     }
