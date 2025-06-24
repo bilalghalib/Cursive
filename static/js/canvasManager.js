@@ -1,6 +1,6 @@
 import { getConfig } from './config.js';
 import { handleImageSelection, displayFullResponse, isZoomMode } from './app.js';
-import { getAllNotebookItems, getDrawings, saveDrawings, getInitialDrawingData } from './dataManager.js';
+import { getAllNotebookItems, getDrawings, saveDrawings, getInitialDrawingData, updateNotebookItem } from './dataManager.js';
 
 let canvas, ctx;
 let isDrawing = false;
@@ -1439,9 +1439,17 @@ async function redrawNotebookItems() {
             
             // Save changes on blur
             const content = bubble.querySelector('.content');
-            content.addEventListener('blur', (e) => {
+            content.addEventListener('blur', async (e) => {
                 content.contentEditable = 'false';
-                // TODO: Save edited content
+
+                const bubbleId = bubble.id.replace('user-text-', '');
+                const items = await getAllNotebookItems();
+                const item = items.find(it => it.id === bubbleId);
+                if (item) {
+                    item.transcription = content.textContent;
+                    await updateNotebookItem(item);
+                    redrawCanvas();
+                }
             });
         }
         
