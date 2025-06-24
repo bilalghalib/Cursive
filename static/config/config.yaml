@@ -3,7 +3,7 @@
 # OpenAI API Settings
 openai:
   api_key: xxxx
-  api_endpoint: https://api.openai.com/v1/assisstants
+  api_endpoint: https://api.openai.com/v1/assistants
   model: gpt-4o
   max_tokens: 300
   
