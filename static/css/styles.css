@@ -959,3 +959,301 @@ body {
     10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
     20%, 40%, 60%, 80% { transform: translateX(5px); }
 }
+/* ========================================
+   Plugin System Styles
+   ======================================== */
+
+/* Plugin Toolbar */
+.toolbar-section.plugin-tools {
+    border-left: 1px solid var(--border-color);
+    padding-left: 10px;
+    margin-left: 10px;
+}
+
+.plugin-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    margin: 0 2px;
+    border: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    min-width: 60px;
+}
+
+.plugin-btn i {
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+
+.plugin-btn .btn-label {
+    font-size: 10px;
+    text-align: center;
+}
+
+.plugin-btn:hover {
+    background-color: var(--active-color);
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
+.plugin-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+/* Plugin Panels */
+.plugin-panel {
+    position: fixed;
+    background: var(--modal-content-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.plugin-panel h3 {
+    margin: 0 0 16px 0;
+    color: var(--text-color);
+    font-size: 18px;
+}
+
+/* OCR Plugin Styles */
+.ocr-result-bubble {
+    font-family: Arial, sans-serif;
+}
+
+.ocr-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+.ocr-result-text {
+    font-size: 14px;
+    line-height: 1.5;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.ocr-copy-btn,
+.ocr-close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    color: #666;
+    font-size: 16px;
+}
+
+.ocr-copy-btn:hover,
+.ocr-close-btn:hover {
+    color: #007bff;
+}
+
+/* Calculator Plugin Styles */
+.calculator-panel {
+    font-family: 'Courier New', monospace;
+}
+
+.calc-btn,
+.calc-fn-btn {
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-color);
+    color: var(--text-color);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+
+.calc-btn:hover,
+.calc-fn-btn:hover {
+    background: var(--active-color);
+    transform: scale(1.05);
+}
+
+.calc-btn:active,
+.calc-fn-btn:active {
+    transform: scale(0.95);
+}
+
+.calc-history-entry {
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.calc-history-entry:hover {
+    background: var(--active-color);
+}
+
+/* Color Picker Plugin Styles */
+.color-picker-panel {
+    width: 320px;
+}
+
+.color-swatch {
+    transition: transform 0.2s ease;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.color-tool-btn {
+    padding: 8px 12px;
+    margin: 0 4px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-color);
+    color: var(--text-color);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.color-tool-btn:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Shape Tools Plugin Styles */
+.shape-toolbar {
+    width: 280px;
+}
+
+.shape-btn {
+    transition: all 0.2s ease;
+}
+
+.shape-btn:hover {
+    transform: scale(1.05);
+    border-color: var(--primary-color);
+}
+
+.shape-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+/* Templates Plugin Styles */
+.template-panel {
+    width: 350px;
+}
+
+.template-card {
+    transition: all 0.2s ease;
+}
+
+.template-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-color: var(--primary-color);
+}
+
+.template-card.selected {
+    border-color: var(--primary-color);
+    background: rgba(0, 123, 255, 0.05);
+}
+
+/* Plugin Settings */
+.plugin-settings {
+    padding: 16px;
+}
+
+.plugin-settings label {
+    display: block;
+    margin-bottom: 12px;
+    color: var(--text-color);
+}
+
+.plugin-settings input[type="text"],
+.plugin-settings input[type="number"],
+.plugin-settings select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--background-color);
+    color: var(--text-color);
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+.plugin-settings input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+/* Responsive Plugin Panels */
+@media (max-width: 768px) {
+    .plugin-panel,
+    .calculator-panel,
+    .color-picker-panel,
+    .shape-toolbar,
+    .template-panel {
+        width: 90vw !important;
+        right: 5vw !important;
+        left: 5vw !important;
+    }
+
+    .plugin-btn {
+        min-width: 50px;
+        padding: 6px 8px;
+    }
+
+    .plugin-btn .btn-label {
+        font-size: 8px;
+    }
+}
+
+/* Plugin Loading States */
+.plugin-loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.plugin-error {
+    border-color: #ff3860 !important;
+}
+
+/* Plugin Tooltips */
+.plugin-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 10000;
+    white-space: nowrap;
+}
+
+/* Animation for plugin activation */
+@keyframes pluginActivate {
+    0% {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.plugin-panel {
+    animation: pluginActivate 0.2s ease-out;
+}
