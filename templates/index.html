@@ -44,7 +44,7 @@
             <button id="save-to-web-btn" title="Save to Web"><i class="fas fa-globe"></i></button>
             <button id="pdf-export-btn" title="Export to PDF"><i class="fas fa-file-pdf"></i></button>
             <button id="about-btn" title="About"><i class="fas fa-info-circle"></i></button>
-            
+
             <!-- More options dropdown -->
             <div class="dropdown">
                 <button id="more-options-btn" title="More Options"><i class="fas fa-ellipsis-h"></i></button>
@@ -54,6 +54,11 @@
                     <a id="settings-btn" href="#"><i class="fas fa-cog"></i> Settings</a>
                 </div>
             </div>
+        </div>
+
+        <!-- Plugin Toolbar - Dynamically populated by plugin manager -->
+        <div id="plugin-toolbar" class="toolbar-section plugin-tools">
+            <!-- Plugins will be rendered here -->
         </div>
     </div>
     <div id="canvas-container">
@@ -145,6 +150,7 @@
     <script type="module" src="{{ url_for('static', filename='js/canvasManager.js') }}?v={{ range(1, 100000) | random }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/promptManager.js') }}?v={{ range(1, 100000) | random }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/aiService.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pluginManager.js') }}?v={{ range(1, 100000) | random }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v={{ range(1, 100000) | random }}"></script>
 
     <script>

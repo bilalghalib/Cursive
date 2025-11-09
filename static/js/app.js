@@ -4,6 +4,8 @@ import { sendImageToAI, sendChatToAI } from './aiService.js';
 import { getConfig } from './config.js';
 import { initPromptCanvas, clearPromptCanvas, submitHandwrittenPrompt, toggleWritePromptPanel } from './promptManager.js';
 import { renderHandwriting, handwritingStyles } from './handwritingSimulation.js';
+import { pluginManager } from './pluginManager.js';
+import { getAllPlugins } from './plugins/index.js';
 
 let notebookItems = [];
 let currentChatHistory = [];
@@ -62,7 +64,10 @@ async function initApp() {
         setDrawMode();
         initDebugConsole();
         setupChatInputHandlers(); // Initialize chat input handlers
-        
+
+        // Initialize plugin system
+        await initPluginSystem();
+
         isAppInitialized = true;
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -1779,4 +1784,42 @@ async function handleStreamToCanvas() {
     }
 }
 
-export { handleImageSelection, handleTranscriptionResponse, displayFullResponse, isZoomMode };
+// Plugin System Initialization
+async function initPluginSystem() {
+    try {
+        console.log('Initializing plugin system...');
+
+        // Get all available plugins
+        const plugins = getAllPlugins();
+
+        // Register each plugin with the manager
+        for (const plugin of plugins) {
+            await pluginManager.registerPlugin(plugin);
+        }
+
+        // Set canvas context for all plugins
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas ? canvas.getContext('2d') : null;
+
+        if (ctx) {
+            pluginManager.getAllPlugins().forEach(plugin => {
+                plugin.canvas = canvas;
+                plugin.ctx = ctx;
+            });
+        }
+
+        // Render plugin toolbar
+        pluginManager.renderPluginToolbar('plugin-toolbar');
+
+        // Log stats
+        const stats = pluginManager.getStats();
+        console.log('Plugin system initialized:', stats);
+        console.log(`Loaded ${stats.total} plugins (${stats.enabled} enabled)`);
+
+    } catch (error) {
+        console.error('Error initializing plugin system:', error);
+        // Don't fail the whole app if plugins fail to initialize
+    }
+}
+
+export { handleImageSelection, handleTranscriptionResponse, displayFullResponse, isZoomMode, pluginManager };
