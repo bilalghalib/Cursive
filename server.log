@@ -465,3 +465,111 @@ DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Use
 DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects', is_directory=True>
 DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/maintenance.lock', is_directory=False>
 DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects', is_directory=True>
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock", inode=205189245, flags=11900, id=18158644447664006588): is_coalesced, is_created, is_file, is_modified, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index", inode=205189245, flags=10800, id=18158644447664006589): is_file, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index", inode=205189216, flags=10800, id=18158644447664006590): is_file, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock", inode=205189246, flags=10100, id=18158644447664006593): is_created, is_file
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock', is_directory=False>
+DEBUG:fsevents:Destination event for rename is NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index", inode=205189245, flags=10800, id=18158644447664006589)
+DEBUG:fsevents:queue_event <FileMovedEvent: src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock', dest_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0/d9b2ac4ae88d05329b90bf43cbdeecb26342fc", inode=205189248, flags=110100, id=18158644447664006605): is_created, is_file, is_hardlink
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0", inode=205189247, flags=20500, id=18158644447664006608): is_created, is_directory, is_inode_meta_mod
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0/tmp_obj_U5wq3P", inode=205189248, flags=111300, id=18158644447664006611): is_coalesced, is_created, is_file, is_hardlink, is_modified, is_removed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock", inode=205189246, flags=11900, id=18158644447664006617): is_coalesced, is_created, is_file, is_modified, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index", inode=205189245, flags=10800, id=18158644447664006619): is_file, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b3/9bdfcb6d548c05d150d818b65fd3a33fc19c02", inode=205189252, flags=110100, id=18158644447664006631): is_created, is_file, is_hardlink
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b3", inode=86771509, flags=20400, id=18158644447664006634): is_directory, is_inode_meta_mod
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b3/tmp_obj_knRsIR", inode=205189252, flags=111300, id=18158644447664006637): is_coalesced, is_created, is_file, is_hardlink, is_modified, is_removed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock", inode=205189251, flags=11900, id=18158644447664006643): is_coalesced, is_created, is_file, is_modified, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index", inode=205189251, flags=10800, id=18158644447664006644): is_file, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index", inode=205189246, flags=10800, id=18158644447664006645): is_file, is_renamed
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0/d9b2ac4ae88d05329b90bf43cbdeecb26342fc', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0', is_directory=True>
+DEBUG:fsevents:queue_event <DirCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0', is_directory=True>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects', is_directory=True>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0', is_directory=True>
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0/tmp_obj_U5wq3P', is_directory=False>
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0/tmp_obj_U5wq3P', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b0', is_directory=True>
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock', is_directory=False>
+DEBUG:fsevents:Destination event for rename is NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index", inode=205189246, flags=10800, id=18158644447664006645)
+DEBUG:fsevents:queue_event <FileMovedEvent: src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock', dest_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b3/9bdfcb6d548c05d150d818b65fd3a33fc19c02', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b3', is_directory=True>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b3', is_directory=True>
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b3/tmp_obj_knRsIR', is_directory=False>
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b3/tmp_obj_knRsIR', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/b3', is_directory=True>
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock', is_directory=False>
+DEBUG:fsevents:Destination event for rename is NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index", inode=205189251, flags=10800, id=18158644447664006644)
+DEBUG:fsevents:queue_event <FileMovedEvent: src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock', dest_path='/Users/bilalghalib/Projects/Github/Cursive/.git/index', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/COMMIT_EDITMSG", inode=86627161, flags=11400, id=18158644447664006651): is_file, is_inode_meta_mod, is_modified
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae/05dd436d18f884ef1be748334c51c33e515778", inode=205189256, flags=110100, id=18158644447664006663): is_created, is_file, is_hardlink
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae", inode=205189255, flags=20500, id=18158644447664006666): is_created, is_directory, is_inode_meta_mod
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae/tmp_obj_YHly6o", inode=205189256, flags=111300, id=18158644447664006669): is_coalesced, is_created, is_file, is_hardlink, is_modified, is_removed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/logs/HEAD", inode=86627169, flags=11000, id=18158644447664006681): is_file, is_modified
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/logs/refs/heads/main", inode=86627172, flags=11000, id=18158644447664006684): is_file, is_modified
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads/main.lock", inode=205189260, flags=11900, id=18158644447664006687): is_coalesced, is_created, is_file, is_modified, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads/main", inode=205189260, flags=10800, id=18158644447664006688): is_file, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads/main", inode=205189234, flags=10800, id=18158644447664006689): is_file, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/HEAD.lock", inode=205189259, flags=10300, id=18158644447664006692): is_coalesced, is_created, is_file, is_removed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/AUTO_MERGE.lock", inode=205189261, flags=10300, id=18158644447664006701): is_coalesced, is_created, is_file, is_removed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/packed-refs.lock", inode=205189262, flags=10300, id=18158644447664006704): is_coalesced, is_created, is_file, is_removed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/maintenance.lock", inode=205189263, flags=10100, id=18158644447664006707): is_created, is_file
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/COMMIT_EDITMSG', is_directory=False>
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae/05dd436d18f884ef1be748334c51c33e515778', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae', is_directory=True>
+DEBUG:fsevents:queue_event <DirCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae', is_directory=True>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects', is_directory=True>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae', is_directory=True>
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae/tmp_obj_YHly6o', is_directory=False>
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae/tmp_obj_YHly6o', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/ae', is_directory=True>
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/logs/HEAD', is_directory=False>
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/logs/refs/heads/main', is_directory=False>
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads/main.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads', is_directory=True>
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads/main.lock', is_directory=False>
+DEBUG:fsevents:Destination event for rename is NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads/main", inode=205189260, flags=10800, id=18158644447664006688)
+DEBUG:fsevents:queue_event <FileMovedEvent: src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads/main.lock', dest_path='/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads/main', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads', is_directory=True>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads', is_directory=True>
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads/main', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/refs/heads', is_directory=True>
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/HEAD.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/HEAD.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/AUTO_MERGE.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/AUTO_MERGE.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/packed-refs.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/packed-refs.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git', is_directory=True>
+DEBUG:fsevents:queue_event <FileCreatedEvent: event_type=created, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/maintenance.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects', is_directory=True>
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/objects/maintenance.lock", inode=205189263, flags=10300, id=18158644447664006710): is_coalesced, is_created, is_file, is_removed
+DEBUG:fsevents:queue_event <FileDeletedEvent: event_type=deleted, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects/maintenance.lock', is_directory=False>
+DEBUG:fsevents:queue_event <DirModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.git/objects', is_directory=True>
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.gitignore", inode=205176990, flags=11400, id=18158644447664007263): is_file, is_inode_meta_mod, is_modified
+DEBUG:fsevents:queue_event <FileModifiedEvent: event_type=modified, src_path='/Users/bilalghalib/Projects/Github/Cursive/.gitignore', is_directory=False>
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index.lock", inode=205189277, flags=11900, id=18158644447664007607): is_coalesced, is_created, is_file, is_modified, is_renamed
+DEBUG:fsevents:NativeEvent(path="/Users/bilalghalib/Projects/Github/Cursive/.git/index", inode=205189277, flags=10800, id=18158644447664007608): is_file, is_renamed
