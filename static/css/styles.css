@@ -1257,3 +1257,329 @@ body {
 .plugin-panel {
     animation: pluginActivate 0.2s ease-out;
 }
+
+/* ========================================
+   Authentication Modal Styles
+   ======================================== */
+
+.auth-modal-content {
+    max-width: 450px;
+    padding: 0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.auth-tabs {
+    display: flex;
+    background: var(--background-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 16px;
+    background: none;
+    border: none;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.auth-tab:hover {
+    background: rgba(0, 123, 255, 0.05);
+    color: var(--text-color);
+}
+
+.auth-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background: var(--background-color);
+}
+
+.auth-form {
+    padding: 32px;
+}
+
+.auth-form h2 {
+    margin: 0 0 8px 0;
+    font-size: 24px;
+    color: var(--text-color);
+}
+
+.auth-subtitle {
+    margin: 0 0 24px 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 14px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--background-color);
+    color: var(--text-color);
+    transition: border-color 0.3s ease;
+    box-sizing: border-box;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.form-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.auth-error {
+    padding: 12px;
+    margin-bottom: 16px;
+    background: rgba(231, 76, 60, 0.1);
+    border: 1px solid rgba(231, 76, 60, 0.3);
+    border-radius: 6px;
+    color: #e74c3c;
+    font-size: 14px;
+}
+
+.password-strength {
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.password-strength.valid {
+    color: #27ae60;
+}
+
+.password-strength.invalid {
+    color: #e74c3c;
+}
+
+.auth-button {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.primary-button {
+    background: var(--primary-color);
+    color: white;
+}
+
+.primary-button:hover:not(:disabled) {
+    background: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.primary-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ========================================
+   Settings Modal Styles
+   ======================================== */
+
+.settings-modal-content {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.settings-modal-content .modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--background-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.settings-modal-content .modal-header h2 {
+    margin: 0;
+    font-size: 22px;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.settings-section {
+    padding: 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-section:last-child {
+    border-bottom: none;
+}
+
+.settings-section h3 {
+    margin: 0 0 16px 0;
+    font-size: 18px;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting-description {
+    margin: 0 0 16px 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.account-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.account-info p {
+    margin: 0;
+    font-size: 15px;
+    color: var(--text-color);
+}
+
+.secondary-button {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--background-color);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.secondary-button:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background: rgba(0, 123, 255, 0.05);
+}
+
+.form-group input[type="password"]#api-key-input {
+    font-family: monospace;
+    letter-spacing: 1px;
+}
+
+.setting-status {
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.setting-status.success {
+    background: rgba(39, 174, 96, 0.1);
+    color: #27ae60;
+    border: 1px solid rgba(39, 174, 96, 0.3);
+}
+
+.setting-status.error {
+    background: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+/* Usage Stats */
+.usage-stats {
+    background: var(--background-secondary);
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 15px;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.stat-value {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.usage-bar {
+    width: 100%;
+    height: 12px;
+    background: var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 16px 0;
+}
+
+.usage-progress {
+    height: 100%;
+    background: var(--primary-color);
+    transition: width 0.5s ease, background-color 0.3s ease;
+    border-radius: 6px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .auth-modal-content,
+    .settings-modal-content {
+        max-width: 95vw;
+        margin: 10px;
+    }
+
+    .auth-form {
+        padding: 24px;
+    }
+
+    .settings-section {
+        padding: 20px;
+    }
+
+    .account-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

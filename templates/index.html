@@ -134,6 +134,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <!-- Import version first -->
     <script type="module">
@@ -234,6 +237,125 @@
             <p>Drop your JSON file here</p>
             <p>or</p>
             <button id="file-select-btn">Select File</button>
+        </div>
+    </div>
+
+    <!-- Authentication Modal -->
+    <div id="auth-modal" class="modal" style="display: none;">
+        <div class="modal-content auth-modal-content">
+            <div class="auth-tabs">
+                <button id="login-tab" class="auth-tab active">Login</button>
+                <button id="signup-tab" class="auth-tab">Sign Up</button>
+            </div>
+
+            <!-- Login Form -->
+            <div id="login-form" class="auth-form">
+                <h2>Welcome Back!</h2>
+                <p class="auth-subtitle">Sign in to access your notebooks</p>
+
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="your@email.com" autocomplete="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
+                </div>
+
+                <div id="login-error" class="auth-error" style="display: none;"></div>
+
+                <button id="login-submit-btn" class="auth-button primary-button">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </button>
+            </div>
+
+            <!-- Signup Form -->
+            <div id="signup-form" class="auth-form" style="display: none;">
+                <h2>Create Account</h2>
+                <p class="auth-subtitle">Start your creative journey with Cursive</p>
+
+                <div class="form-group">
+                    <label for="signup-email">Email</label>
+                    <input type="email" id="signup-email" placeholder="your@email.com" autocomplete="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signup-password">Password</label>
+                    <input type="password" id="signup-password" placeholder="••••••••" autocomplete="new-password" required>
+                    <small class="form-hint">Minimum 8 characters, include uppercase, lowercase, and a number</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="signup-confirm-password">Confirm Password</label>
+                    <input type="password" id="signup-confirm-password" placeholder="••••••••" autocomplete="new-password" required>
+                </div>
+
+                <div id="signup-error" class="auth-error" style="display: none;"></div>
+                <div id="password-strength" class="password-strength"></div>
+
+                <button id="signup-submit-btn" class="auth-button primary-button">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal" style="display: none;">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-cog"></i> Settings</h2>
+                <span class="close" title="Close">&times;</span>
+            </div>
+
+            <div class="settings-section">
+                <h3>Account</h3>
+                <div class="account-info">
+                    <p><strong>Email:</strong> <span id="user-email">-</span></p>
+                    <button id="logout-btn" class="secondary-button">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h3><i class="fas fa-key"></i> API Key (BYOK)</h3>
+                <p class="setting-description">
+                    Add your own Anthropic API key to avoid usage fees. Your key is encrypted and never shared.
+                </p>
+                <div class="form-group">
+                    <input type="password" id="api-key-input" placeholder="sk-ant-..." autocomplete="off">
+                    <button id="save-api-key-btn" class="primary-button">
+                        <i class="fas fa-save"></i> Save API Key
+                    </button>
+                </div>
+                <div id="api-key-status" class="setting-status"></div>
+            </div>
+
+            <!-- Usage tracking coming soon with Supabase backend -->
+            <!--
+            <div class="settings-section">
+                <h3><i class="fas fa-chart-line"></i> Usage This Month</h3>
+                <div class="usage-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Tokens Used:</span>
+                        <span class="stat-value" id="tokens-used">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Limit:</span>
+                        <span class="stat-value" id="tokens-limit">10,000</span>
+                    </div>
+                    <div class="usage-bar">
+                        <div id="usage-progress" class="usage-progress"></div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Cost:</span>
+                        <span class="stat-value" id="usage-cost">$0.00</span>
+                    </div>
+                </div>
+            </div>
+            -->
         </div>
     </div>
 </body>
