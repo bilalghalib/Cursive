@@ -457,7 +457,7 @@ def save_to_web():
 @app.route('/')
 @app.route('/pages/<page_id>')
 def serve_page(page_id=None):
-    """Serve the main page or a shared page."""
+    """Serve the main page or a shared page (legacy file-based)."""
     try:
         page_data = None
 
@@ -492,6 +492,33 @@ def serve_page(page_id=None):
     except Exception as e:
         logger.error(f"Error serving page {page_id}: {str(e)}")
         return f"Error loading page: {str(e)}", 500
+
+
+@app.route('/share/<share_id>')
+def serve_shared_page(share_id):
+    """
+    Serve a shared notebook from Supabase.
+    This is a modern approach that loads shared notebooks from the database.
+    """
+    try:
+        # Sanitize share_id
+        if not re.match(r'^[a-zA-Z0-9-]+$', share_id):
+            return "Invalid share ID", 400
+
+        # Pass the share_id to the frontend
+        # The frontend will use sharingService.js to load the notebook from Supabase
+        response = make_response(render_template('index.html', share_id=share_id, is_shared_view=True))
+
+        # Disable caching
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error serving shared page {share_id}: {str(e)}")
+        return f"Error loading shared page: {str(e)}", 500
 
 
 # ============================================================================

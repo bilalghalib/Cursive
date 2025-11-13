@@ -15,6 +15,13 @@
             window.pageData = {{ page_data|tojson|safe }};
         </script>
         {% endif %}
+        {% if share_id %}
+        <script>
+            // Shared notebook - will be loaded from Supabase by sharingService.js
+            window.shareId = "{{ share_id }}";
+            window.isSharedView = {{ is_shared_view|tojson|safe }};
+        </script>
+        {% endif %}
     </head>
     <body>
         <div id="toolbar">
@@ -177,6 +184,10 @@
     
     <!-- Use direct script tags with version parameter -->
     <script type="module" src="{{ url_for('static', filename='js/config.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/supabaseClient.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/authService.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/sharingService.js') }}?v={{ range(1, 100000) | random }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/collaborationService.js') }}?v={{ range(1, 100000) | random }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/dataManager.js') }}?v={{ range(1, 100000) | random }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/handwritingSimulation.js') }}?v={{ range(1, 100000) | random }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/canvasManager.js') }}?v={{ range(1, 100000) | random }}"></script>

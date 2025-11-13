@@ -1,4 +1,11 @@
 import { getConfig } from './config.js';
+import {
+  getOrCreateDefaultNotebook,
+  saveDrawingsToSupabase,
+  loadDrawingsFromSupabase,
+  createShareLink
+} from './sharingService.js';
+import { isAuthenticated } from './authService.js';
 
 async function getMaxNotebookItems() {
     const config = await getConfig();
@@ -98,11 +105,40 @@ export async function getAllNotebookItems() {
 }
 
 export async function getDrawings() {
+    // Try to load from Supabase if authenticated
+    if (isAuthenticated()) {
+        try {
+            const notebookId = await getOrCreateDefaultNotebook();
+            const drawings = await loadDrawingsFromSupabase(notebookId);
+
+            // Also save to localStorage for offline fallback
+            localStorage.setItem('drawings', JSON.stringify(drawings));
+
+            return drawings;
+        } catch (error) {
+            console.error('Error loading from Supabase, falling back to localStorage:', error);
+            return JSON.parse(localStorage.getItem('drawings') || '[]');
+        }
+    }
+
+    // Fallback to localStorage
     return JSON.parse(localStorage.getItem('drawings') || '[]');
 }
 
 export async function saveDrawings(drawings) {
+    // Always save to localStorage for offline support
     localStorage.setItem('drawings', JSON.stringify(drawings));
+
+    // Also save to Supabase if authenticated
+    if (isAuthenticated()) {
+        try {
+            const notebookId = await getOrCreateDefaultNotebook();
+            await saveDrawingsToSupabase(notebookId, drawings);
+            console.log('✅ Drawings saved to Supabase and localStorage');
+        } catch (error) {
+            console.error('Error saving to Supabase (saved to localStorage):', error);
+        }
+    }
 }
 export async function exportNotebook() {
     const STORAGE_KEY = await getStorageKey();
@@ -157,11 +193,26 @@ export async function importNotebook(file, config, timeout = 30000) {
 
 export async function saveToWeb() {
     try {
+        // Modern approach: Use Supabase sharing
+        if (isAuthenticated()) {
+            const notebookId = await getOrCreateDefaultNotebook();
+
+            // Ensure drawings are saved first
+            const drawings = await getDrawings();
+            await saveDrawingsToSupabase(notebookId, drawings);
+
+            // Create shareable link
+            const shareUrl = await createShareLink(notebookId, false); // false = view-only
+
+            return shareUrl;
+        }
+
+        // Fallback to legacy file-based sharing for non-authenticated users
         const items = await getAllNotebookItems();
         const drawings = await getDrawings();
-        
+
         const exportData = { items, drawings };
-        
+
         const response = await fetch('/api/save-to-web', {
             method: 'POST',
             headers: {
@@ -169,13 +220,13 @@ export async function saveToWeb() {
             },
             body: JSON.stringify(exportData)
         });
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
             return result.url;
         } else {
