@@ -9,8 +9,8 @@ openai:
   
 claude:
   api_key: xxxx
-  model: claude-3-5-sonnet-20241022
-  max_tokens: 1024
+  model: claude-sonnet-4-5
+  max_tokens: 4096
   
 # Canvas Settings
 canvas:
