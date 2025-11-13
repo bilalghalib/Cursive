@@ -6,7 +6,7 @@ import { initPromptCanvas, clearPromptCanvas, submitHandwrittenPrompt, toggleWri
 import { renderHandwriting, handwritingStyles } from './handwritingSimulation.js';
 import { pluginManager } from './pluginManager.js';
 import { getAllPlugins } from './plugins/index.js';
-import { isAuthenticated, login, register, logout, getCurrentUser, validatePassword, isValidEmail, saveApiKey, getUsageStats } from './authService.js';
+import { isAuthenticated, login, signUp, logout, getCurrentUser, validatePassword, isValidEmail, getSession } from './authService.js';
 
 let notebookItems = [];
 let currentChatHistory = [];
@@ -1849,18 +1849,15 @@ function hideAuthModal() {
     }
 }
 
-function setupAuthUI() {
+async function setupAuthUI() {
     // Update user email in settings
-    const user = getCurrentUser();
+    const user = await getCurrentUser();
     if (user) {
         const userEmailElement = document.getElementById('user-email');
         if (userEmailElement) {
             userEmailElement.textContent = user.email;
         }
     }
-
-    // Load usage stats
-    loadUsageStats();
 
     // Setup settings button handler
     const settingsBtn = document.getElementById('settings-btn');
@@ -1919,14 +1916,20 @@ function setupAuthModalHandlers() {
             loginSubmitBtn.disabled = true;
             loginSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
 
-            const result = await login(email, password);
+            try {
+                const { data, error } = await login(email, password);
 
-            if (result.success) {
-                hideAuthModal();
-                // Reload to initialize app with authentication
-                window.location.reload();
-            } else {
-                showError(loginError, result.error || 'Login failed');
+                if (error) {
+                    showError(loginError, error.message || 'Login failed');
+                    loginSubmitBtn.disabled = false;
+                    loginSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                } else {
+                    hideAuthModal();
+                    // Reload to initialize app with authentication
+                    window.location.reload();
+                }
+            } catch (error) {
+                showError(loginError, error.message || 'Login failed');
                 loginSubmitBtn.disabled = false;
                 loginSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
             }
@@ -1993,14 +1996,20 @@ function setupAuthModalHandlers() {
             signupSubmitBtn.disabled = true;
             signupSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
 
-            const result = await register(email, password);
+            try {
+                const { data, error } = await signUp(email, password);
 
-            if (result.success) {
-                hideAuthModal();
-                // Reload to initialize app with authentication
-                window.location.reload();
-            } else {
-                showError(signupError, result.error || 'Registration failed');
+                if (error) {
+                    showError(signupError, error.message || 'Registration failed');
+                    signupSubmitBtn.disabled = false;
+                    signupSubmitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+                } else {
+                    hideAuthModal();
+                    // Reload to initialize app with authentication
+                    window.location.reload();
+                }
+            } catch (error) {
+                showError(signupError, error.message || 'Registration failed');
                 signupSubmitBtn.disabled = false;
                 signupSubmitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
             }
@@ -2027,11 +2036,12 @@ function showSettingsModal() {
     if (settingsModal) {
         settingsModal.style.display = 'block';
         setupSettingsModalHandlers();
-        loadUsageStats();
     }
 }
 
 function setupSettingsModalHandlers() {
+    const settingsModal = document.getElementById('settings-modal');
+
     // Logout button
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn && !logoutBtn.dataset.handlerAttached) {
@@ -2043,7 +2053,7 @@ function setupSettingsModalHandlers() {
         });
     }
 
-    // Save API key button
+    // Save API key button (store in localStorage for now, will integrate with Supabase DB)
     const saveApiKeyBtn = document.getElementById('save-api-key-btn');
     const apiKeyInput = document.getElementById('api-key-input');
     const apiKeyStatus = document.getElementById('api-key-status');
@@ -2059,8 +2069,12 @@ function setupSettingsModalHandlers() {
                 return;
             }
 
-            if (!apiKey.startsWith('sk-ant-')) {
-                apiKeyStatus.textContent = 'Invalid API key format (should start with sk-ant-)';
+            // Validate Anthropic, OpenAI, or Claude API key format
+            const isAnthropicKey = apiKey.startsWith('sk-ant-');
+            const isOpenAIKey = apiKey.startsWith('sk-');
+
+            if (!isAnthropicKey && !isOpenAIKey) {
+                apiKeyStatus.textContent = 'Invalid API key format (should start with sk-ant- for Anthropic or sk- for OpenAI)';
                 apiKeyStatus.className = 'setting-status error';
                 return;
             }
@@ -2068,14 +2082,16 @@ function setupSettingsModalHandlers() {
             saveApiKeyBtn.disabled = true;
             saveApiKeyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
-            const result = await saveApiKey(apiKey);
+            try {
+                // Store in localStorage for now
+                // TODO: Store in Supabase database with encryption
+                localStorage.setItem('cursive_user_api_key', apiKey);
 
-            if (result.success) {
                 apiKeyStatus.textContent = '✓ API key saved successfully';
                 apiKeyStatus.className = 'setting-status success';
                 apiKeyInput.value = '';
-            } else {
-                apiKeyStatus.textContent = result.error || 'Failed to save API key';
+            } catch (error) {
+                apiKeyStatus.textContent = 'Failed to save API key';
                 apiKeyStatus.className = 'setting-status error';
             }
 
@@ -2085,7 +2101,7 @@ function setupSettingsModalHandlers() {
     }
 
     // Close button
-    const closeBtn = settingsModal.querySelector('.close');
+    const closeBtn = settingsModal ? settingsModal.querySelector('.close') : null;
     if (closeBtn && !closeBtn.dataset.handlerAttached) {
         closeBtn.dataset.handlerAttached = 'true';
         closeBtn.addEventListener('click', () => {

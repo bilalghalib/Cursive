@@ -1,243 +1,311 @@
 /**
  * Authentication Service
  *
- * Handles user authentication with Flask backend:
- * - Register
- * - Login
- * - Logout
- * - Token management
- * - API key management (BYOK)
+ * Handles user authentication with Supabase:
+ * - Sign up
+ * - Log in
+ * - Log out
+ * - Password reset
+ * - Auth state changes
  */
 
-const AUTH_TOKEN_KEY = 'cursive_auth_token';
-const USER_DATA_KEY = 'cursive_user_data';
+import getSupabase from './supabaseClient.js';
 
 /**
- * Register a new user
+ * Sign up a new user
  *
  * @param {string} email - User's email address
  * @param {string} password - User's password (min 8 characters)
- * @returns {Promise<Object>} { success: boolean, user?: object, error?: string }
+ * @returns {Promise<Object>} User data and session
+ * @throws {Error} If signup fails
  */
-export async function register(email, password) {
+export async function signUp(email, password) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('Supabase client not initialized');
+  }
+
   try {
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: email.toLowerCase().trim(),
-        password
-      }),
+    const { data, error } = await supabase.auth.signUp({
+      email: email.toLowerCase().trim(),
+      password,
+      options: {
+        // Email confirmation settings
+        emailRedirectTo: window.location.origin,
+      }
     });
 
-    const data = await response.json();
-
-    if (response.ok) {
-      // Store token and user data
-      if (data.token) {
-        localStorage.setItem(AUTH_TOKEN_KEY, data.token);
-      }
-      if (data.user) {
-        localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
-      }
-      console.log('✅ Registration successful:', data.user?.email);
-      return { success: true, user: data.user };
-    } else {
-      console.error('Registration error:', data.error);
-      return { success: false, error: data.error || 'Registration failed' };
+    if (error) {
+      console.error('Sign up error:', error);
+      throw new Error(error.message);
     }
+
+    console.log('✅ Sign up successful:', data.user?.email);
+    return data;
+
   } catch (error) {
-    console.error('Registration failed:', error);
-    return { success: false, error: 'Network error. Please try again.' };
+    console.error('Sign up failed:', error);
+    throw error;
   }
 }
 
 /**
- * Login user
+ * Log in with email and password
  *
  * @param {string} email - User's email address
  * @param {string} password - User's password
- * @returns {Promise<Object>} { success: boolean, user?: object, error?: string }
+ * @returns {Promise<Object>} User data and session
+ * @throws {Error} If login fails
  */
 export async function login(email, password) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('Supabase client not initialized');
+  }
+
   try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: email.toLowerCase().trim(),
-        password
-      }),
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase().trim(),
+      password,
     });
 
-    const data = await response.json();
-
-    if (response.ok) {
-      // Store token and user data
-      if (data.token) {
-        localStorage.setItem(AUTH_TOKEN_KEY, data.token);
-      }
-      if (data.user) {
-        localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
-      }
-      console.log('✅ Login successful:', data.user?.email);
-      return { success: true, user: data.user };
-    } else {
-      console.error('Login error:', data.error);
-      return { success: false, error: data.error || 'Login failed' };
+    if (error) {
+      console.error('Login error:', error);
+      throw new Error(error.message);
     }
+
+    console.log('✅ Login successful:', data.user?.email);
+    return data;
+
   } catch (error) {
     console.error('Login failed:', error);
-    return { success: false, error: 'Network error. Please try again.' };
+    throw error;
   }
 }
 
 /**
- * Logout user
+ * Log out the current user
  *
  * @returns {Promise<void>}
+ * @throws {Error} If logout fails
  */
 export async function logout() {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('Supabase client not initialized');
+  }
+
   try {
-    const token = getAuthToken();
-    if (token) {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error('Logout error:', error);
+      throw new Error(error.message);
     }
-  } catch (error) {
-    console.error('Logout error:', error);
-  } finally {
-    // Clear local storage
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(USER_DATA_KEY);
+
     console.log('✅ Logout successful');
-    // Reload page to reset app state
-    window.location.reload();
+
+  } catch (error) {
+    console.error('Logout failed:', error);
+    throw error;
   }
 }
 
 /**
- * Get current auth token
+ * Send password reset email
  *
- * @returns {string|null}
+ * @param {string} email - User's email address
+ * @returns {Promise<void>}
+ * @throws {Error} If request fails
  */
-export function getAuthToken() {
-  return localStorage.getItem(AUTH_TOKEN_KEY);
+export async function resetPassword(email) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('Supabase client not initialized');
+  }
+
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) {
+      console.error('Password reset error:', error);
+      throw new Error(error.message);
+    }
+
+    console.log('✅ Password reset email sent');
+
+  } catch (error) {
+    console.error('Password reset failed:', error);
+    throw error;
+  }
 }
 
 /**
- * Get current user data
+ * Update user password (when logged in)
  *
- * @returns {Object|null}
+ * @param {string} newPassword - New password
+ * @returns {Promise<void>}
+ * @throws {Error} If update fails
  */
-export function getCurrentUser() {
-  const userData = localStorage.getItem(USER_DATA_KEY);
-  return userData ? JSON.parse(userData) : null;
+export async function updatePassword(newPassword) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('Supabase client not initialized');
+  }
+
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      console.error('Password update error:', error);
+      throw new Error(error.message);
+    }
+
+    console.log('✅ Password updated successfully');
+
+  } catch (error) {
+    console.error('Password update failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get current session
+ *
+ * @returns {Promise<Object|null>} Session object or null
+ */
+export async function getSession() {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error('Error getting session:', error);
+      return null;
+    }
+
+    return session;
+
+  } catch (error) {
+    console.error('Error getting session:', error);
+    return null;
+  }
+}
+
+/**
+ * Get current user
+ *
+ * @returns {Promise<Object|null>} User object or null
+ */
+export async function getCurrentUser() {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error) {
+      console.error('Error getting user:', error);
+      return null;
+    }
+
+    return user;
+
+  } catch (error) {
+    console.error('Error getting user:', error);
+    return null;
+  }
+}
+
+/**
+ * Listen for authentication state changes
+ *
+ * @param {Function} callback - Callback function (event, session) => {}
+ * @returns {Object} Subscription object with unsubscribe method
+ *
+ * @example
+ * const subscription = onAuthStateChange((event, session) => {
+ *   if (event === 'SIGNED_IN') {
+ *     console.log('User signed in:', session.user);
+ *   } else if (event === 'SIGNED_OUT') {
+ *     console.log('User signed out');
+ *   }
+ * });
+ *
+ * // Later, to unsubscribe:
+ * subscription.unsubscribe();
+ */
+export function onAuthStateChange(callback) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    console.error('Supabase client not initialized');
+    return { unsubscribe: () => {} };
+  }
+
+  try {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log('🔐 Auth state changed:', event, session?.user?.email);
+        callback(event, session);
+      }
+    );
+
+    return subscription;
+
+  } catch (error) {
+    console.error('Error setting up auth state listener:', error);
+    return { unsubscribe: () => {} };
+  }
 }
 
 /**
  * Check if user is authenticated
  *
- * @returns {boolean}
+ * @returns {Promise<boolean>} True if authenticated, false otherwise
  */
-export function isAuthenticated() {
-  return !!getAuthToken();
+export async function isAuthenticated() {
+  const session = await getSession();
+  return !!session;
 }
 
 /**
- * Make authenticated API request
+ * Sign in with OAuth provider (Google, GitHub, etc.)
  *
- * @param {string} url - API endpoint
- * @param {Object} options - Fetch options
- * @returns {Promise<Response>}
+ * @param {string} provider - OAuth provider name ('google', 'github', etc.)
+ * @returns {Promise<void>}
+ * @throws {Error} If OAuth sign in fails
  */
-export async function authenticatedFetch(url, options = {}) {
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error('Not authenticated');
+export async function signInWithOAuth(provider) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('Supabase client not initialized');
   }
 
-  const headers = {
-    ...options.headers,
-    'Authorization': `Bearer ${token}`,
-  };
-
-  if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
-    options.body = JSON.stringify(options.body);
-  }
-
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
-
-  // If unauthorized, clear auth and redirect to login
-  if (response.status === 401) {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(USER_DATA_KEY);
-    window.location.reload();
-    throw new Error('Session expired. Please login again.');
-  }
-
-  return response;
-}
-
-/**
- * Save user's API key (BYOK)
- *
- * @param {string} apiKey - Anthropic API key
- * @returns {Promise<Object>} { success: boolean, error?: string }
- */
-export async function saveApiKey(apiKey) {
   try {
-    const response = await authenticatedFetch('/api/auth/api-key', {
-      method: 'POST',
-      body: { api_key: apiKey },
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: window.location.origin,
+      }
     });
 
-    const data = await response.json();
-
-    if (response.ok) {
-      console.log('✅ API key saved successfully');
-      return { success: true };
-    } else {
-      return { success: false, error: data.error || 'Failed to save API key' };
+    if (error) {
+      console.error('OAuth sign in error:', error);
+      throw new Error(error.message);
     }
-  } catch (error) {
-    console.error('API key save error:', error);
-    return { success: false, error: error.message };
-  }
-}
 
-/**
- * Get user's usage stats
- *
- * @returns {Promise<Object>} { tokens_used: number, cost: number, limit: number }
- */
-export async function getUsageStats() {
-  try {
-    const response = await authenticatedFetch('/api/billing/usage');
+    // User will be redirected to OAuth provider
+    console.log(`🔐 Redirecting to ${provider} for authentication...`);
 
-    if (response.ok) {
-      const data = await response.json();
-      return data;
-    } else {
-      console.error('Failed to fetch usage stats');
-      return { tokens_used: 0, cost: 0, limit: 10000 };
-    }
   } catch (error) {
-    console.error('Usage stats error:', error);
-    return { tokens_used: 0, cost: 0, limit: 10000 };
+    console.error('OAuth sign in failed:', error);
+    throw error;
   }
 }
 
@@ -256,39 +324,39 @@ export function isValidEmail(email) {
  * Validate password strength
  *
  * @param {string} password - Password to validate
- * @returns {Object} { valid: boolean, message?: string }
+ * @returns {Object} { isValid: boolean, message: string }
  */
 export function validatePassword(password) {
   if (password.length < 8) {
     return {
-      valid: false,
+      isValid: false,
       message: 'Password must be at least 8 characters long'
     };
   }
 
   if (!/[A-Z]/.test(password)) {
     return {
-      valid: false,
+      isValid: false,
       message: 'Password must contain at least one uppercase letter'
     };
   }
 
   if (!/[a-z]/.test(password)) {
     return {
-      valid: false,
+      isValid: false,
       message: 'Password must contain at least one lowercase letter'
     };
   }
 
   if (!/[0-9]/.test(password)) {
     return {
-      valid: false,
+      isValid: false,
       message: 'Password must contain at least one number'
     };
   }
 
   return {
-    valid: true,
+    isValid: true,
     message: 'Password is strong'
   };
 }
