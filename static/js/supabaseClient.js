@@ -2,15 +2,18 @@
  * Supabase Client Configuration
  *
  * This module initializes the Supabase client for frontend use.
- * Replace SUPABASE_URL and SUPABASE_ANON_KEY with your actual values.
+ *
+ * SETUP INSTRUCTIONS:
+ * 1. Go to https://app.supabase.com/project/YOUR_PROJECT/settings/api
+ * 2. Copy your Project URL and anon/public key
+ * 3. Replace the values below
+ * 4. See .env.local.example for database setup
  */
 
-// NOTE: These values should come from your Supabase project settings
+// ⚠️ CONFIGURE THESE VALUES ⚠️
 // Get them from: Supabase Dashboard > Settings > API
-//
-// For production, consider using environment variables or a config endpoint
 const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // e.g., 'https://xxxxx.supabase.co'
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Public key (safe to expose)
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Public key (safe to expose in frontend)
 
 // Import Supabase client from CDN
 // Make sure to include this in index.html:

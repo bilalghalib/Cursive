@@ -12,9 +12,32 @@ dist/
 *.tsbuildinfo
 .vscode/
 .idea/
+.env.local
 /pages
 /pages
 .DS_Store
 
 **/.claude/settings.local.json
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Flask
+instance/
+flask_session/
+.webassets-cache
+
+# Environment
+venv/
+env/
+ENV/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
