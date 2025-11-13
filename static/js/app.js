@@ -6,7 +6,9 @@ import { initPromptCanvas, clearPromptCanvas, submitHandwrittenPrompt, toggleWri
 import { renderHandwriting, handwritingStyles } from './handwritingSimulation.js';
 import { pluginManager } from './pluginManager.js';
 import { getAllPlugins } from './plugins/index.js';
-import { isAuthenticated, login, signUp, logout, getCurrentUser, validatePassword, isValidEmail, getSession } from './authService.js';
+import { isAuthenticated, login, signUp, logout, getCurrentUser, validatePassword, isValidEmail, getSession, getPasswordStrength } from './authService.js';
+import { loadSharedNotebook } from './sharingService.js';
+import { initCollaboration, broadcastCursorMove } from './collaborationService.js';
 
 let notebookItems = [];
 let currentChatHistory = [];
@@ -37,26 +39,47 @@ async function initApp() {
         setupAuthUI();
 
         await initCanvas();
-        
+
         let drawings = [];
-        
-        if (window.pageData) {
-            // If pageData is available, use it
+
+        // Check if this is a shared notebook view
+        if (window.shareId) {
+            console.log('Loading shared notebook:', window.shareId);
+            try {
+                const { notebook, drawings: sharedDrawings } = await loadSharedNotebook(window.shareId);
+                drawings = sharedDrawings;
+                notebookItems = [];
+
+                console.log(`Loaded shared notebook: ${notebook.title} (${drawings.length} drawings)`);
+
+                // Save to localStorage for offline viewing
+                await saveDrawings(drawings);
+
+                // Initialize collaboration if user is authenticated
+                if (isAuthenticated()) {
+                    await initCollaboration(notebook.id);
+                }
+            } catch (error) {
+                console.error('Error loading shared notebook:', error);
+                alert('Unable to load shared notebook. It may be private or no longer exist.');
+            }
+        } else if (window.pageData) {
+            // If pageData is available, use it (legacy file-based sharing)
             notebookItems = window.pageData.items || [];
             drawings = window.pageData.drawings || [];
             console.log("Loaded data from window.pageData:", { items: notebookItems.length, drawings: drawings.length });
-            
+
             // Save the notebook items to localStorage
             const STORAGE_KEY = config.storage.key;
             localStorage.setItem(STORAGE_KEY, JSON.stringify(notebookItems));
-            
+
             // Save the drawings to localStorage
             await saveDrawings(drawings);
         } else {
-            // Load from localStorage if window.pageData is not available
+            // Load from localStorage/Supabase if no page data
             drawings = await getMostRecentDrawings();
             notebookItems = await getAllNotebookItems();
-            
+
             // If both window.pageData and localStorage are empty, load initial drawings
             if (drawings.length === 0) {
                 drawings = await getInitialDrawingData();
@@ -1957,13 +1980,13 @@ function setupAuthModalHandlers() {
         // Password validation on input
         signupPassword.addEventListener('input', () => {
             const password = signupPassword.value;
-            const validation = validatePassword(password);
+            const strength = getPasswordStrength(password);
             const strengthDiv = document.getElementById('password-strength');
 
             if (strengthDiv) {
                 if (password.length > 0) {
-                    strengthDiv.textContent = validation.valid ? '✓ Strong password' : validation.message;
-                    strengthDiv.className = validation.valid ? 'password-strength valid' : 'password-strength invalid';
+                    strengthDiv.textContent = strength.message;
+                    strengthDiv.style.color = strength.color;
                 } else {
                     strengthDiv.textContent = '';
                 }
@@ -1985,9 +2008,8 @@ function setupAuthModalHandlers() {
                 return;
             }
 
-            const validation = validatePassword(password);
-            if (!validation.valid) {
-                showError(signupError, validation.message);
+            if (!validatePassword(password)) {
+                showError(signupError, 'Password must be at least 8 characters with uppercase, lowercase, and a number');
                 return;
             }
 
