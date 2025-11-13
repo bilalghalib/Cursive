@@ -367,6 +367,55 @@ body {
     opacity: 0.9;
 }
 
+/* Chat input controls */
+.chat-input-controls {
+    margin-top: 20px;
+    padding: 15px;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--background-color);
+}
+
+.chat-input-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.chat-input-toggle button {
+    flex: 1;
+    padding: 8px 16px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.chat-input-toggle button:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.chat-input-toggle button.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.chat-input-area {
+    margin-bottom: 15px;
+    position: relative;
+}
+
+.hidden {
+    display: none !important;
+}
+
 /* Direct chat button */
 #direct-chat-button {
     position: fixed;

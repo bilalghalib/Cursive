@@ -94,6 +94,35 @@
                 </div>
             </div>
             <div id="response-content"></div>
+
+            <!-- Chat input controls -->
+            <div class="chat-input-controls">
+                <div class="chat-input-toggle">
+                    <button id="type-text-btn" class="active" title="Type text">
+                        <i class="fas fa-keyboard"></i> Type
+                    </button>
+                    <button id="draw-text-btn" title="Draw text">
+                        <i class="fas fa-pen"></i> Draw
+                    </button>
+                </div>
+
+                <div class="chat-input-area">
+                    <!-- Text input (visible by default) -->
+                    <textarea id="chat-input" placeholder="Type your response..." rows="3"></textarea>
+
+                    <!-- Drawing canvas (hidden by default) -->
+                    <div id="chat-drawing-container" class="hidden">
+                        <canvas id="chat-drawing-canvas"></canvas>
+                        <button id="clear-drawing-btn" class="icon-button" title="Clear drawing">
+                            <i class="fas fa-eraser"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="send-chat-btn" class="primary-button">
+                    <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
         </div>
     </div>
     <div id="prompt-modal" class="modal">
