@@ -1635,5 +1635,17 @@ export async function clearNotebook() {
     return { clearedItems: true, clearedDrawings: true };
 }
 
+// Export getter functions for canvas state variables
+export function getCanvasScale() {
+    return scale;
+}
+
+export function getCanvasPanX() {
+    return panX;
+}
+
+export function getCanvasPanY() {
+    return panY;
+}
 
 export { refreshCanvas };

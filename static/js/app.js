@@ -1,4 +1,4 @@
-import { initCanvas, setDrawMode, setSelectMode, setPanMode, setZoomMode, clearCanvas, drawTextOnCanvas, clearSelection, redrawCanvas, zoomIn, zoomOut, undo, redo, refreshCanvas, updateDrawings } from './canvasManager.js';
+import { initCanvas, setDrawMode, setSelectMode, setPanMode, setZoomMode, clearCanvas, drawTextOnCanvas, clearSelection, redrawCanvas, zoomIn, zoomOut, undo, redo, refreshCanvas, updateDrawings, getCanvasScale, getCanvasPanX, getCanvasPanY } from './canvasManager.js';
 import { saveNotebookItem, getAllNotebookItems, exportNotebook, importNotebook, clearNotebook, saveDrawings, getDrawings, getInitialDrawingData, saveToWeb,getMostRecentDrawings } from './dataManager.js';
 import { sendImageToAI, sendChatToAI } from './aiService.js';
 import { getConfig } from './config.js';
@@ -1748,12 +1748,15 @@ async function handleStreamToCanvas() {
         
         // Stream the response directly to canvas
         // The streamHandwritingToCanvas function handles all the streaming
+        const scale = getCanvasScale();
+        const panX = getCanvasPanX();
+        const panY = getCanvasPanY();
         const response = await streamHandwritingToCanvas(
             prompt,
             centerX / scale - panX / scale, // Convert to canvas coordinates
             centerY / scale - panY / scale,
             600, // Max width
-            { 
+            {
                 style: 'cursive', // Use cursive style
                 fontSize: 24, // Slightly larger font
                 animationDelay: false, // No animation during streaming
