@@ -27,12 +27,12 @@ export async function sendImageToAI(imageData) {
               },
               {
                 type: "text",
-                text: "Transcribe this handwritten text and respond in valid JSON with the following structure:\n" +
+                text: "Transcribe this handwritten text and respond with ONLY valid JSON (no markdown code blocks, no extra text):\n" +
                 "{\n" +
                 "  \"transcription\": \"provide only transcription of the handwriting\",\n" +
                 "  \"tags\": [\"tag1\", \"tag2\", \"tag3\", \"tag4\", \"tag5\"]\n" +
                 "}\n" +
-                "Provide up to 5 relevant tags for the content."
+                "Provide up to 5 relevant tags for the content. Return ONLY the JSON object, nothing else."
               }
             ]
           }
@@ -139,7 +139,17 @@ export async function sendChatToAI(chatHistory, onProgress = null) {
 
 function parseAIResponse(response) {
   try {
-    const parsedResponse = JSON.parse(response);
+    // Claude 4.5 may wrap JSON in markdown code blocks - strip them
+    let cleanedResponse = response.trim();
+
+    // Remove markdown code block markers if present
+    if (cleanedResponse.startsWith('```json')) {
+      cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleanedResponse.startsWith('```')) {
+      cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+
+    const parsedResponse = JSON.parse(cleanedResponse);
     return {
       transcription: parsedResponse.transcription || '',
       tags: parsedResponse.tags || [],
@@ -147,6 +157,7 @@ function parseAIResponse(response) {
     };
   } catch (error) {
     console.error('Error parsing AI response:', error);
+    console.error('Raw response:', response);
     return {
       transcription: 'Error parsing AI response',
       tags: [],

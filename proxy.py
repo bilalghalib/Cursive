@@ -124,6 +124,14 @@ client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
 # ============================================================================
 
 ALLOWED_MODELS = [
+    # Claude 4.5 models (latest)
+    'claude-sonnet-4-5',
+    'claude-sonnet-4-5-20250929',
+    'claude-haiku-4-5',
+    'claude-haiku-4-5-20251001',
+    'claude-opus-4-1',
+    'claude-opus-4-1-20250805',
+    # Claude 3.5 models (legacy)
     'claude-3-5-sonnet-20241022',
     'claude-3-opus-20240229',
     'claude-3-sonnet-20240229',

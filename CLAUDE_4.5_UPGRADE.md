@@ -31,11 +31,26 @@ max_tokens: 4096
 - API returned 404 error: "model not found"
 - Image transcription failed completely
 
-### 3. No Backend Changes Needed
-Your `proxy.py` reads the model from `config.yaml` dynamically:
+### 3. Backend Changes Required
+Updated `proxy.py` to include Claude 4.5 models in validation:
 ```python
-config = await getConfig()
-model = config['claude']['model']  # Automatically uses new model
+ALLOWED_MODELS = [
+    # Claude 4.5 models (latest)
+    'claude-sonnet-4-5',
+    'claude-sonnet-4-5-20250929',
+    'claude-haiku-4-5',
+    'claude-opus-4-1',
+    # ... legacy models
+]
+```
+
+### 4. Frontend Parser Updated
+Updated `aiService.js` to handle Claude 4.5's markdown-wrapped JSON responses:
+```javascript
+// Strips ```json markers before parsing
+if (cleanedResponse.startsWith('```json')) {
+  cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+}
 ```
 
 ---
@@ -170,6 +185,8 @@ response = client.messages.create(
 - [x] Server running on port 5022
 - [x] Model updated to `claude-sonnet-4-5`
 - [x] Database connected to Supabase
+- [x] Backend ALLOWED_MODELS list updated with Claude 4.5 models
+- [x] Frontend parser updated to handle Claude 4.5 markdown responses
 - [ ] Test handwriting transcription
 - [ ] Test AI chat responses
 - [ ] Verify canvas functionality
