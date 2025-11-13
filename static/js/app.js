@@ -6,6 +6,7 @@ import { initPromptCanvas, clearPromptCanvas, submitHandwrittenPrompt, toggleWri
 import { renderHandwriting, handwritingStyles } from './handwritingSimulation.js';
 import { pluginManager } from './pluginManager.js';
 import { getAllPlugins } from './plugins/index.js';
+import { isAuthenticated, login, register, logout, getCurrentUser, validatePassword, isValidEmail, saveApiKey, getUsageStats } from './authService.js';
 
 let notebookItems = [];
 let currentChatHistory = [];
@@ -16,15 +17,25 @@ let isZoomMode = false;
 
 async function initApp() {
     if (isAppInitialized) return;
-    
+
+    // Check authentication first
+    if (!isAuthenticated()) {
+        console.log('User not authenticated, showing auth modal');
+        showAuthModal();
+        return; // Don't initialize app until user logs in
+    }
+
     showLoading();
-    
+
     try {
         const config = await getConfig();
         if (!config) {
             throw new Error('Configuration not loaded. Cannot initialize app.');
         }
-        
+
+        // Initialize auth UI
+        setupAuthUI();
+
         await initCanvas();
         
         let drawings = [];
@@ -1819,6 +1830,302 @@ async function initPluginSystem() {
     } catch (error) {
         console.error('Error initializing plugin system:', error);
         // Don't fail the whole app if plugins fail to initialize
+    }
+}
+
+// Authentication UI Functions
+function showAuthModal() {
+    const authModal = document.getElementById('auth-modal');
+    if (authModal) {
+        authModal.style.display = 'block';
+        setupAuthModalHandlers();
+    }
+}
+
+function hideAuthModal() {
+    const authModal = document.getElementById('auth-modal');
+    if (authModal) {
+        authModal.style.display = 'none';
+    }
+}
+
+function setupAuthUI() {
+    // Update user email in settings
+    const user = getCurrentUser();
+    if (user) {
+        const userEmailElement = document.getElementById('user-email');
+        if (userEmailElement) {
+            userEmailElement.textContent = user.email;
+        }
+    }
+
+    // Load usage stats
+    loadUsageStats();
+
+    // Setup settings button handler
+    const settingsBtn = document.getElementById('settings-btn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            showSettingsModal();
+        });
+    }
+}
+
+function setupAuthModalHandlers() {
+    // Tab switching
+    const loginTab = document.getElementById('login-tab');
+    const signupTab = document.getElementById('signup-tab');
+    const loginForm = document.getElementById('login-form');
+    const signupForm = document.getElementById('signup-form');
+
+    if (loginTab && signupTab && loginForm && signupForm) {
+        loginTab.addEventListener('click', () => {
+            loginTab.classList.add('active');
+            signupTab.classList.remove('active');
+            loginForm.style.display = 'block';
+            signupForm.style.display = 'none';
+        });
+
+        signupTab.addEventListener('click', () => {
+            signupTab.classList.add('active');
+            loginTab.classList.remove('active');
+            signupForm.style.display = 'block';
+            loginForm.style.display = 'none';
+        });
+    }
+
+    // Login form submission
+    const loginSubmitBtn = document.getElementById('login-submit-btn');
+    const loginEmail = document.getElementById('login-email');
+    const loginPassword = document.getElementById('login-password');
+    const loginError = document.getElementById('login-error');
+
+    if (loginSubmitBtn && loginEmail && loginPassword) {
+        loginSubmitBtn.addEventListener('click', async () => {
+            const email = loginEmail.value.trim();
+            const password = loginPassword.value;
+
+            if (!email || !password) {
+                showError(loginError, 'Please enter email and password');
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                showError(loginError, 'Please enter a valid email');
+                return;
+            }
+
+            loginSubmitBtn.disabled = true;
+            loginSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+
+            const result = await login(email, password);
+
+            if (result.success) {
+                hideAuthModal();
+                // Reload to initialize app with authentication
+                window.location.reload();
+            } else {
+                showError(loginError, result.error || 'Login failed');
+                loginSubmitBtn.disabled = false;
+                loginSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+            }
+        });
+
+        // Allow Enter key to submit
+        loginPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loginSubmitBtn.click();
+            }
+        });
+    }
+
+    // Signup form submission
+    const signupSubmitBtn = document.getElementById('signup-submit-btn');
+    const signupEmail = document.getElementById('signup-email');
+    const signupPassword = document.getElementById('signup-password');
+    const signupConfirmPassword = document.getElementById('signup-confirm-password');
+    const signupError = document.getElementById('signup-error');
+
+    if (signupSubmitBtn && signupEmail && signupPassword && signupConfirmPassword) {
+        // Password validation on input
+        signupPassword.addEventListener('input', () => {
+            const password = signupPassword.value;
+            const validation = validatePassword(password);
+            const strengthDiv = document.getElementById('password-strength');
+
+            if (strengthDiv) {
+                if (password.length > 0) {
+                    strengthDiv.textContent = validation.valid ? '✓ Strong password' : validation.message;
+                    strengthDiv.className = validation.valid ? 'password-strength valid' : 'password-strength invalid';
+                } else {
+                    strengthDiv.textContent = '';
+                }
+            }
+        });
+
+        signupSubmitBtn.addEventListener('click', async () => {
+            const email = signupEmail.value.trim();
+            const password = signupPassword.value;
+            const confirmPassword = signupConfirmPassword.value;
+
+            if (!email || !password || !confirmPassword) {
+                showError(signupError, 'Please fill in all fields');
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                showError(signupError, 'Please enter a valid email');
+                return;
+            }
+
+            const validation = validatePassword(password);
+            if (!validation.valid) {
+                showError(signupError, validation.message);
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showError(signupError, 'Passwords do not match');
+                return;
+            }
+
+            signupSubmitBtn.disabled = true;
+            signupSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
+
+            const result = await register(email, password);
+
+            if (result.success) {
+                hideAuthModal();
+                // Reload to initialize app with authentication
+                window.location.reload();
+            } else {
+                showError(signupError, result.error || 'Registration failed');
+                signupSubmitBtn.disabled = false;
+                signupSubmitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+            }
+        });
+
+        // Allow Enter key to submit
+        signupConfirmPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                signupSubmitBtn.click();
+            }
+        });
+    }
+}
+
+function showError(errorElement, message) {
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+}
+
+function showSettingsModal() {
+    const settingsModal = document.getElementById('settings-modal');
+    if (settingsModal) {
+        settingsModal.style.display = 'block';
+        setupSettingsModalHandlers();
+        loadUsageStats();
+    }
+}
+
+function setupSettingsModalHandlers() {
+    // Logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn && !logoutBtn.dataset.handlerAttached) {
+        logoutBtn.dataset.handlerAttached = 'true';
+        logoutBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to logout?')) {
+                await logout();
+            }
+        });
+    }
+
+    // Save API key button
+    const saveApiKeyBtn = document.getElementById('save-api-key-btn');
+    const apiKeyInput = document.getElementById('api-key-input');
+    const apiKeyStatus = document.getElementById('api-key-status');
+
+    if (saveApiKeyBtn && apiKeyInput && !saveApiKeyBtn.dataset.handlerAttached) {
+        saveApiKeyBtn.dataset.handlerAttached = 'true';
+        saveApiKeyBtn.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+
+            if (!apiKey) {
+                apiKeyStatus.textContent = 'Please enter an API key';
+                apiKeyStatus.className = 'setting-status error';
+                return;
+            }
+
+            if (!apiKey.startsWith('sk-ant-')) {
+                apiKeyStatus.textContent = 'Invalid API key format (should start with sk-ant-)';
+                apiKeyStatus.className = 'setting-status error';
+                return;
+            }
+
+            saveApiKeyBtn.disabled = true;
+            saveApiKeyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+            const result = await saveApiKey(apiKey);
+
+            if (result.success) {
+                apiKeyStatus.textContent = '✓ API key saved successfully';
+                apiKeyStatus.className = 'setting-status success';
+                apiKeyInput.value = '';
+            } else {
+                apiKeyStatus.textContent = result.error || 'Failed to save API key';
+                apiKeyStatus.className = 'setting-status error';
+            }
+
+            saveApiKeyBtn.disabled = false;
+            saveApiKeyBtn.innerHTML = '<i class="fas fa-save"></i> Save API Key';
+        });
+    }
+
+    // Close button
+    const closeBtn = settingsModal.querySelector('.close');
+    if (closeBtn && !closeBtn.dataset.handlerAttached) {
+        closeBtn.dataset.handlerAttached = 'true';
+        closeBtn.addEventListener('click', () => {
+            settingsModal.style.display = 'none';
+        });
+    }
+}
+
+async function loadUsageStats() {
+    const stats = await getUsageStats();
+
+    const tokensUsedElement = document.getElementById('tokens-used');
+    const tokensLimitElement = document.getElementById('tokens-limit');
+    const usageCostElement = document.getElementById('usage-cost');
+    const usageProgressElement = document.getElementById('usage-progress');
+
+    if (tokensUsedElement) {
+        tokensUsedElement.textContent = stats.tokens_used.toLocaleString();
+    }
+
+    if (tokensLimitElement) {
+        tokensLimitElement.textContent = stats.limit.toLocaleString();
+    }
+
+    if (usageCostElement) {
+        usageCostElement.textContent = `$${stats.cost.toFixed(2)}`;
+    }
+
+    if (usageProgressElement) {
+        const percentage = (stats.tokens_used / stats.limit) * 100;
+        usageProgressElement.style.width = `${Math.min(percentage, 100)}%`;
+
+        // Change color based on usage
+        if (percentage >= 90) {
+            usageProgressElement.style.backgroundColor = '#e74c3c';
+        } else if (percentage >= 70) {
+            usageProgressElement.style.backgroundColor = '#f39c12';
+        } else {
+            usageProgressElement.style.backgroundColor = '#3498db';
+        }
     }
 }
 
