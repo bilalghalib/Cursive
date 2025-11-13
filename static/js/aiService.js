@@ -1,7 +1,5 @@
 import { getConfig } from './config.js';
 
-const BASE_URL = `http://${window.location.hostname}:5022/api/claude`;
-
 export async function sendImageToAI(imageData) {
   try {
     const config = await getConfig();
@@ -165,12 +163,3 @@ function parseAIResponse(response) {
     };
   }
 }
-
-function downloadImage(dataUrl, filename) {/*
-   const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link); 
-*/}

@@ -6,11 +6,14 @@ API usage tracking, and billing.
 """
 
 from database import db
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_login import UserMixin
 from sqlalchemy import JSON, Text, Index
 from cryptography.fernet import Fernet
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class User(UserMixin, db.Model):
@@ -43,11 +46,11 @@ class User(UserMixin, db.Model):
     stripe_customer_id = db.Column(db.String(255), nullable=True, index=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_verified = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 
@@ -68,8 +71,12 @@ class User(UserMixin, db.Model):
             if not encryption_key:
                 raise ValueError("ENCRYPTION_KEY not set in environment")
 
-            fernet = Fernet(encryption_key.encode())
-            self.encrypted_api_key = fernet.encrypt(api_key.encode()).decode()
+            try:
+                fernet = Fernet(encryption_key.encode())
+                self.encrypted_api_key = fernet.encrypt(api_key.encode()).decode()
+            except Exception as e:
+                logger.error(f"Invalid ENCRYPTION_KEY: {str(e)}")
+                raise ValueError("Invalid encryption key configuration")
 
     def get_api_key(self):
         """
@@ -85,8 +92,12 @@ class User(UserMixin, db.Model):
         if not encryption_key:
             raise ValueError("ENCRYPTION_KEY not set in environment")
 
-        fernet = Fernet(encryption_key.encode())
-        return fernet.decrypt(self.encrypted_api_key.encode()).decode()
+        try:
+            fernet = Fernet(encryption_key.encode())
+            return fernet.decrypt(self.encrypted_api_key.encode()).decode()
+        except Exception as e:
+            logger.error(f"Error decrypting API key: {str(e)}")
+            return None
 
     def to_dict(self):
         """Convert user object to dictionary."""
@@ -123,11 +134,11 @@ class Notebook(db.Model):
     description = db.Column(db.Text, nullable=True)
     is_shared = db.Column(db.Boolean, default=False, nullable=False)
     share_id = db.Column(db.String(36), unique=True, nullable=True, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 
@@ -184,7 +195,7 @@ class Drawing(db.Model):
         nullable=False
     )  # handwriting, typed, shape
     canvas_state = db.Column(JSON, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
 
     def to_dict(self):
         """Convert drawing object to dictionary."""
@@ -225,7 +236,7 @@ class APIUsage(db.Model):
     cost = db.Column(db.Numeric(10, 6), nullable=False)
     model = db.Column(db.String(100), nullable=False)
     endpoint = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
 
     # Indexes for efficient querying
     __table_args__ = (
@@ -276,11 +287,11 @@ class Billing(db.Model):
     current_period_start = db.Column(db.DateTime, nullable=True)
     current_period_end = db.Column(db.DateTime, nullable=True)
     tokens_used_this_period = db.Column(db.Integer, default=0, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 
