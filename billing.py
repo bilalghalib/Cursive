@@ -12,7 +12,7 @@ from models import User, Billing, APIUsage
 import stripe
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)
@@ -50,9 +50,33 @@ def calculate_cost(tokens_input, tokens_output, model='claude-3-5-sonnet-2024102
     Returns:
         Decimal: Total cost in USD
     """
-    # Get pricing from environment (per 1K tokens)
-    input_price = Decimal(os.getenv('ANTHROPIC_INPUT_PRICE', '0.003'))
-    output_price = Decimal(os.getenv('ANTHROPIC_OUTPUT_PRICE', '0.015'))
+    # Model-specific pricing (per 1K tokens) - Updated as of November 2025
+    # Source: https://docs.anthropic.com/en/docs/about-claude/models#model-comparison
+    PRICING = {
+        # Claude 4.5 models
+        'claude-haiku-4-5': {'input': Decimal('0.00025'), 'output': Decimal('0.00125')},
+        'claude-haiku-4-5-20251001': {'input': Decimal('0.00025'), 'output': Decimal('0.00125')},
+        'claude-sonnet-4-5': {'input': Decimal('0.003'), 'output': Decimal('0.015')},
+        'claude-sonnet-4-5-20250929': {'input': Decimal('0.003'), 'output': Decimal('0.015')},
+        'claude-opus-4-1': {'input': Decimal('0.015'), 'output': Decimal('0.075')},
+        'claude-opus-4-1-20250805': {'input': Decimal('0.015'), 'output': Decimal('0.075')},
+        # Claude 3.5 models (legacy)
+        'claude-3-5-sonnet-20241022': {'input': Decimal('0.003'), 'output': Decimal('0.015')},
+        # Claude 3 models (legacy)
+        'claude-3-opus-20240229': {'input': Decimal('0.015'), 'output': Decimal('0.075')},
+        'claude-3-sonnet-20240229': {'input': Decimal('0.003'), 'output': Decimal('0.015')},
+        'claude-3-haiku-20240307': {'input': Decimal('0.00025'), 'output': Decimal('0.00125')},
+    }
+
+    # Get pricing for the specific model, fallback to Sonnet pricing if unknown
+    if model in PRICING:
+        input_price = PRICING[model]['input']
+        output_price = PRICING[model]['output']
+    else:
+        logger.warning(f"Unknown model '{model}', using Sonnet pricing as fallback")
+        input_price = Decimal('0.003')
+        output_price = Decimal('0.015')
+
     markup = Decimal(os.getenv('MARKUP_PERCENTAGE', '15')) / 100
 
     # Calculate base cost
@@ -101,7 +125,7 @@ def track_usage(user_id, tokens_input, tokens_output, model, endpoint):
         billing = Billing.query.filter_by(user_id=user_id).first()
         if billing:
             billing.tokens_used_this_period += total_tokens
-            billing.updated_at = datetime.utcnow()
+            billing.updated_at = datetime.now(timezone.utc)
 
         db.session.commit()
 
@@ -154,7 +178,7 @@ def get_usage():
 
         elif period == 'last_30_days':
             # Last 30 days
-            start_date = datetime.utcnow() - timedelta(days=30)
+            start_date = datetime.now(timezone.utc) - timedelta(days=30)
             usage_records = APIUsage.query.filter(
                 APIUsage.user_id == current_user.id,
                 APIUsage.created_at >= start_date
@@ -400,16 +424,29 @@ def handle_checkout_completed(session):
     user = User.query.get(user_id)
 
     if billing and user:
-        billing.stripe_subscription_id = subscription_id
-        billing.subscription_status = 'active'
-        billing.current_period_start = datetime.utcnow()
-        billing.current_period_end = datetime.utcnow() + timedelta(days=30)
-        billing.tokens_used_this_period = 0
+        # Get subscription details from Stripe to get correct billing period
+        try:
+            subscription = stripe.Subscription.retrieve(subscription_id)
+            billing.stripe_subscription_id = subscription_id
+            billing.subscription_status = 'active'
+            billing.current_period_start = datetime.fromtimestamp(subscription.current_period_start, tz=timezone.utc)
+            billing.current_period_end = datetime.fromtimestamp(subscription.current_period_end, tz=timezone.utc)
+            billing.tokens_used_this_period = 0
 
-        user.subscription_tier = tier
+            user.subscription_tier = tier
 
-        db.session.commit()
-        logger.info(f"Subscription activated for user {user_id}: {tier}")
+            db.session.commit()
+            logger.info(f"Subscription activated for user {user_id}: {tier}")
+        except stripe.error.StripeError as e:
+            logger.error(f"Error retrieving subscription from Stripe: {str(e)}")
+            # Fallback to current time if Stripe call fails
+            billing.stripe_subscription_id = subscription_id
+            billing.subscription_status = 'active'
+            billing.current_period_start = datetime.now(timezone.utc)
+            billing.current_period_end = datetime.now(timezone.utc) + timedelta(days=30)
+            billing.tokens_used_this_period = 0
+            user.subscription_tier = tier
+            db.session.commit()
 
 
 def handle_subscription_updated(subscription):

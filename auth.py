@@ -12,7 +12,7 @@ from marshmallow import Schema, fields, ValidationError, validate
 from database import db
 from models import User, Billing
 import jwt
-import datetime
+from datetime import datetime, timedelta, timezone
 import os
 import logging
 import re
@@ -131,8 +131,8 @@ def generate_token(user_id):
     """
     payload = {
         'user_id': user_id,
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7),
-        'iat': datetime.datetime.utcnow()
+        'exp': datetime.now(timezone.utc) + timedelta(days=7),
+        'iat': datetime.now(timezone.utc)
     }
 
     secret_key = os.getenv('FLASK_SECRET_KEY')

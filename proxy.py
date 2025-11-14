@@ -29,7 +29,8 @@ from api_routes import init_api_routes
 from models import User
 
 # Setup logging
-logging.basicConfig(level=logging.DEBUG)
+log_level = logging.DEBUG if os.getenv('FLASK_ENV') == 'development' else logging.INFO
+logging.basicConfig(level=log_level)
 logger = logging.getLogger(__name__)
 
 # Base directory
@@ -228,8 +229,8 @@ def handle_claude_request():
         if user_id and not current_user.get_api_key():
             try:
                 # Extract token usage from response
-                tokens_input = response.usage.input_tokens if hasattr(response.usage, 'input_tokens') else 0
-                tokens_output = response.usage.output_tokens if hasattr(response.usage, 'output_tokens') else 0
+                tokens_input = response.usage.input_tokens
+                tokens_output = response.usage.output_tokens
 
                 track_usage(
                     user_id=user_id,
@@ -247,8 +248,8 @@ def handle_claude_request():
             "model": response.model,
             "role": response.role,
             "usage": {
-                "input_tokens": response.usage.input_tokens if hasattr(response.usage, 'input_tokens') else 0,
-                "output_tokens": response.usage.output_tokens if hasattr(response.usage, 'output_tokens') else 0,
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
             }
         }
 
@@ -333,8 +334,8 @@ def handle_claude_stream_request():
                     # Get final message to extract token usage
                     final_message = stream.get_final_message()
                     if hasattr(final_message, 'usage'):
-                        tokens_input = final_message.usage.input_tokens if hasattr(final_message.usage, 'input_tokens') else 0
-                        tokens_output = final_message.usage.output_tokens if hasattr(final_message.usage, 'output_tokens') else 0
+                        tokens_input = final_message.usage.input_tokens
+                        tokens_output = final_message.usage.output_tokens
 
                 yield "data: [DONE]\n\n"
 

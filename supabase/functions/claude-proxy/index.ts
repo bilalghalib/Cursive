@@ -17,15 +17,35 @@ const CLAUDE_API_KEY = Deno.env.get('CLAUDE_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-// Pricing configuration (per 1K tokens)
+// Model-specific pricing (per 1K tokens) - Updated November 2025
+// Source: https://docs.anthropic.com/en/docs/about-claude/models#model-comparison
 const PRICING = {
+  // Claude 4.5 models
+  'claude-haiku-4-5': { input: 0.00025, output: 0.00125 },
+  'claude-haiku-4-5-20251001': { input: 0.00025, output: 0.00125 },
+  'claude-sonnet-4-5': { input: 0.003, output: 0.015 },
+  'claude-sonnet-4-5-20250929': { input: 0.003, output: 0.015 },
+  'claude-opus-4-1': { input: 0.015, output: 0.075 },
+  'claude-opus-4-1-20250805': { input: 0.015, output: 0.075 },
+  // Claude 3.5 models (legacy)
   'claude-3-5-sonnet-20241022': { input: 0.003, output: 0.015 },
+  // Claude 3 models (legacy)
   'claude-3-opus-20240229': { input: 0.015, output: 0.075 },
   'claude-3-sonnet-20240229': { input: 0.003, output: 0.015 },
   'claude-3-haiku-20240307': { input: 0.00025, output: 0.00125 },
 };
 
 const MARKUP_PERCENTAGE = 0.15; // 15% markup for non-BYOK users
+
+const ALLOWED_MODELS = [
+  'claude-haiku-4-5', 'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-5', 'claude-sonnet-4-5-20250929',
+  'claude-opus-4-1', 'claude-opus-4-1-20250805',
+  'claude-3-5-sonnet-20241022',
+  'claude-3-opus-20240229',
+  'claude-3-sonnet-20240229',
+  'claude-3-haiku-20240307'
+];
 
 /**
  * Calculate cost for API usage
@@ -202,6 +222,34 @@ serve(async (req: Request) => {
     if (!model || !messages || !Array.isArray(messages)) {
       return new Response(
         JSON.stringify({ error: 'Invalid request: model and messages required' }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    }
+
+    // Validate model
+    if (!ALLOWED_MODELS.includes(model)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid model: ${model}. Allowed models: ${ALLOWED_MODELS.join(', ')}` }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    }
+
+    // Validate max_tokens
+    if (max_tokens && (max_tokens < 1 || max_tokens > 4096)) {
+      return new Response(
+        JSON.stringify({ error: 'max_tokens must be between 1 and 4096' }),
         {
           status: 400,
           headers: {
