@@ -5,17 +5,29 @@
  * It should be imported before any other modules that need Supabase access.
  */
 
-// Get Supabase from the CDN (loaded in index.html)
-const { createClient } = supabase;
+import { createClient } from '@supabase/supabase-js'
 
-// Supabase configuration
-// IMPORTANT: These values need to be set from your Supabase project
-// Get them from: https://supabase.com/dashboard > Your Project > Settings > API
-const SUPABASE_URL = 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-key-here';
+// Supabase configuration from environment variables
+// For development: These come from .env via Vite (VITE_ prefix)
+// For production: Set in Vercel/Netlify environment variables
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:54321'
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+
+if (!SUPABASE_URL || SUPABASE_URL === 'http://localhost:54321') {
+  console.warn('⚠️  Using local Supabase. Set VITE_SUPABASE_URL for production.')
+}
 
 // Create and export Supabase client
-export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+})
+
+// Backwards compatibility export
+export const supabase = supabaseClient
 
 // Helper to get current session
 export async function getSupabaseSession() {
@@ -37,4 +49,18 @@ export async function getSupabaseUser() {
   return user;
 }
 
-console.log('✅ Supabase client initialized');
+// Helper: Check if user is authenticated
+export async function isAuthenticated() {
+  const user = await getSupabaseUser()
+  return user !== null
+}
+
+// Helper: Listen for auth state changes
+export function onAuthStateChange(callback) {
+  return supabaseClient.auth.onAuthStateChange((event, session) => {
+    console.log(`🔐 Auth event: ${event}`, session?.user?.email || 'no user')
+    callback(event, session)
+  })
+}
+
+console.log('✅ Supabase client initialized:', SUPABASE_URL)
