@@ -33,6 +33,13 @@ let redoStack = [];
 
 let touchIdentifier = null;
 
+// Background template state
+let backgroundTemplate = {
+    enabled: false,
+    type: null,
+    settings: {}
+};
+
 export async function initCanvas() {
     try {
         const config = await getConfig();
@@ -467,9 +474,266 @@ function drawCurrentStroke() {
     }
 }
 
+// Draw background template (grid, lines, etc.)
+function drawBackgroundTemplate() {
+    if (!backgroundTemplate.enabled || !backgroundTemplate.type) {
+        return;
+    }
+
+    const settings = backgroundTemplate.settings;
+    const opacity = settings.templateOpacity || 0.3;
+
+    ctx.save();
+
+    switch (backgroundTemplate.type) {
+        case 'grid':
+            drawGridTemplate(settings.gridSpacing || 20, opacity);
+            break;
+        case 'lines':
+            drawLinesTemplate(settings.lineSpacing || 30, opacity);
+            break;
+        case 'dots':
+            drawDotsTemplate(settings.dotSpacing || 20, opacity);
+            break;
+        case 'music':
+            drawMusicStaffTemplate(opacity);
+            break;
+        case 'calendar':
+            drawCalendarTemplate(opacity);
+            break;
+        case 'cornell':
+            drawCornellNotesTemplate(opacity);
+            break;
+        case 'storyboard':
+            drawStoryboardTemplate(opacity);
+            break;
+        case 'kanban':
+            drawKanbanTemplate(opacity);
+            break;
+        case 'mindmap':
+            drawMindMapTemplate(opacity);
+            break;
+    }
+
+    ctx.restore();
+}
+
+function drawGridTemplate(spacing, opacity) {
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+    ctx.lineWidth = 1;
+
+    for (let x = 0; x < width; x += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+    }
+
+    for (let y = 0; y < height; y += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+    }
+}
+
+function drawLinesTemplate(spacing, opacity) {
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+    ctx.lineWidth = 1;
+
+    for (let y = spacing; y < height; y += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+    }
+}
+
+function drawDotsTemplate(spacing, opacity) {
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+
+    for (let x = spacing; x < width; x += spacing) {
+        for (let y = spacing; y < height; y += spacing) {
+            ctx.beginPath();
+            ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+}
+
+function drawMusicStaffTemplate(opacity) {
+    const staffHeight = 100;
+    const lineSpacing = 15;
+    const marginTop = 50;
+    const width = canvas.width;
+
+    ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+    ctx.lineWidth = 1;
+
+    for (let staffY = marginTop; staffY < canvas.height - staffHeight; staffY += staffHeight + 50) {
+        for (let i = 0; i < 5; i++) {
+            const y = staffY + i * lineSpacing;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+    }
+}
+
+function drawCalendarTemplate(opacity) {
+    const cols = 7;
+    const rows = 5;
+    const cellWidth = canvas.width / cols;
+    const cellHeight = (canvas.height - 50) / rows;
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+    ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 2})`;
+    ctx.lineWidth = 2;
+    ctx.font = '14px Arial';
+
+    days.forEach((day, i) => {
+        const x = i * cellWidth;
+        ctx.fillText(day, x + 10, 25);
+    });
+
+    for (let i = 0; i <= cols; i++) {
+        const x = i * cellWidth;
+        ctx.beginPath();
+        ctx.moveTo(x, 40);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+    }
+
+    for (let i = 0; i <= rows; i++) {
+        const y = 40 + i * cellHeight;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+    }
+}
+
+function drawCornellNotesTemplate(opacity) {
+    const cueWidth = canvas.width * 0.3;
+    const summaryHeight = canvas.height * 0.2;
+
+    ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+    ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 2})`;
+    ctx.lineWidth = 2;
+    ctx.font = 'bold 16px Arial';
+
+    ctx.beginPath();
+    ctx.moveTo(cueWidth, 0);
+    ctx.lineTo(cueWidth, canvas.height - summaryHeight);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height - summaryHeight);
+    ctx.lineTo(canvas.width, canvas.height - summaryHeight);
+    ctx.stroke();
+
+    ctx.fillText('Cues', 10, 30);
+    ctx.fillText('Notes', cueWidth + 10, 30);
+    ctx.fillText('Summary', 10, canvas.height - summaryHeight + 30);
+}
+
+function drawStoryboardTemplate(opacity) {
+    const cols = 3;
+    const rows = 2;
+    const cellWidth = (canvas.width - 40) / cols;
+    const cellHeight = (canvas.height - 40) / rows;
+    const margin = 20;
+
+    ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+    ctx.lineWidth = 2;
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const x = margin + col * cellWidth;
+            const y = margin + row * cellHeight;
+            ctx.strokeRect(x, y, cellWidth - 10, cellHeight - 10);
+        }
+    }
+}
+
+function drawKanbanTemplate(opacity) {
+    const cols = 3;
+    const colWidth = canvas.width / cols;
+    const labels = ['To Do', 'In Progress', 'Done'];
+
+    ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+    ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 2})`;
+    ctx.lineWidth = 2;
+    ctx.font = 'bold 18px Arial';
+
+    for (let i = 0; i <= cols; i++) {
+        const x = i * colWidth;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(0, 50);
+    ctx.lineTo(canvas.width, 50);
+    ctx.stroke();
+
+    labels.forEach((label, i) => {
+        const x = i * colWidth + colWidth / 2;
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x, 30);
+    });
+}
+
+function drawMindMapTemplate(opacity) {
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = 60;
+    const branches = 6;
+
+    ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+    ctx.fillStyle = `rgba(0, 123, 255, ${opacity})`;
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    for (let i = 0; i < branches; i++) {
+        const angle = (i * 2 * Math.PI) / branches;
+        const x = centerX + Math.cos(angle) * 200;
+        const y = centerY + Math.sin(angle) * 200;
+
+        ctx.beginPath();
+        ctx.moveTo(centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(x, y, 40, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(100, 200, 100, ${opacity})`;
+        ctx.fill();
+        ctx.stroke();
+    }
+}
+
 export function redrawCanvas() {
     fillCanvasBackground();
-    
+    drawBackgroundTemplate();
+
     // Update stroke color based on theme
     const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
     if (isDarkMode) {
@@ -477,13 +741,35 @@ export function redrawCanvas() {
     } else {
         ctx.strokeStyle = '#000000'; // Default black
     }
-    
+
     drawStoredDrawings();
     drawCurrentStroke();
     if (mode === 'select' && isDrawing) {
         drawSelectionRect();
     }
     redrawNotebookItems();
+}
+
+// Background template management functions
+export function setBackgroundTemplate(type, settings) {
+    backgroundTemplate.type = type;
+    backgroundTemplate.settings = { ...backgroundTemplate.settings, ...settings };
+    backgroundTemplate.enabled = type !== 'blank' && type !== null;
+    redrawCanvas();
+}
+
+export function toggleBackgroundTemplate() {
+    backgroundTemplate.enabled = !backgroundTemplate.enabled;
+    redrawCanvas();
+    return backgroundTemplate.enabled;
+}
+
+export function isBackgroundTemplateEnabled() {
+    return backgroundTemplate.enabled;
+}
+
+export function getBackgroundTemplate() {
+    return { ...backgroundTemplate };
 }
 
 function drawSelectionRect() {
