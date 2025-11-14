@@ -15,7 +15,7 @@ class ShapeToolsPlugin extends BasePlugin {
             description: 'Draw geometric shapes and arrows',
             icon: 'fa-shapes',
             category: 'drawing',
-            version: '1.0.0',
+            version: '2.0.0',
             author: 'Cursive Team',
             settings: {
                 currentShape: 'rectangle',
@@ -32,6 +32,12 @@ class ShapeToolsPlugin extends BasePlugin {
         this.startPoint = null;
         this.currentPoint = null;
         this.previewShape = null;
+
+        // Vector shape storage
+        this.vectorShapes = [];
+        this.selectedShape = null;
+        this.dragHandle = null;
+        this.isEditMode = false;
 
         this.shapes = {
             rectangle: 'Rectangle',
@@ -65,6 +71,14 @@ class ShapeToolsPlugin extends BasePlugin {
         }
         this.hideShapeToolbar();
         this.isDrawing = false;
+
+        // Remove keyboard handler
+        if (this.keyboardHandler) {
+            document.removeEventListener('keydown', this.keyboardHandler);
+        }
+
+        // Clear selection
+        this.selectedShape = null;
     }
 
     showShapeToolbar() {
@@ -81,6 +95,8 @@ class ShapeToolsPlugin extends BasePlugin {
             right: 20px;
             top: 80px;
             width: 280px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
             background: white;
             border: 2px solid #333;
             border-radius: 8px;
@@ -141,8 +157,21 @@ class ShapeToolsPlugin extends BasePlugin {
                 </label>
             </div>
 
+            <div class="shape-actions" style="margin-bottom: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button id="shape-delete-btn" style="padding: 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+                <button id="shape-clear-btn" style="padding: 8px; background: #ffc107; color: black; border: none; border-radius: 4px; cursor: pointer;">
+                    <i class="fas fa-eraser"></i> Clear All
+                </button>
+            </div>
+
             <div class="shape-instructions" style="font-size: 12px; color: #666; padding: 8px; background: #f5f5f5; border-radius: 4px;">
-                <i class="fas fa-info-circle"></i> Click and drag to draw the selected shape
+                <i class="fas fa-info-circle"></i>
+                <strong>Draw:</strong> Click and drag<br>
+                <strong>Edit:</strong> Click shape to select, drag to move<br>
+                <strong>Resize:</strong> Drag corner handles<br>
+                <strong>Delete:</strong> Select shape and press Delete or click Delete button
             </div>
         `;
 
@@ -210,33 +239,116 @@ class ShapeToolsPlugin extends BasePlugin {
             this.settings.gridSize = parseInt(e.target.value);
         });
 
+        // Delete and Clear buttons
+        document.getElementById('shape-delete-btn').addEventListener('click', () => {
+            this.deleteSelectedShape();
+        });
+
+        document.getElementById('shape-clear-btn').addEventListener('click', () => {
+            if (confirm('Clear all shapes? This cannot be undone.')) {
+                this.clearShapes();
+            }
+        });
+
         // Close button
         document.getElementById('shape-close-btn').addEventListener('click', () => {
             this.hideShapeToolbar();
         });
+
+        // Keyboard shortcuts
+        this.keyboardHandler = (e) => {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (this.selectedShape) {
+                    e.preventDefault();
+                    this.deleteSelectedShape();
+                }
+            } else if (e.key === 'Escape') {
+                this.selectedShape = null;
+                this.redrawShapes();
+            }
+        };
+        document.addEventListener('keydown', this.keyboardHandler);
     }
 
     onMouseDown(event, canvasX, canvasY) {
+        const point = this.snapPoint({ x: canvasX, y: canvasY });
+
+        // Check if clicking on a handle of selected shape
+        if (this.selectedShape) {
+            const handle = this.getHandleAtPoint(point);
+            if (handle) {
+                this.dragHandle = handle;
+                this.startPoint = point;
+                return;
+            }
+        }
+
+        // Check if clicking on an existing shape
+        const clickedShape = this.getShapeAtPoint(point);
+        if (clickedShape) {
+            this.selectedShape = clickedShape;
+            this.isEditMode = true;
+            this.startPoint = point;
+            this.redrawShapes();
+            return;
+        }
+
+        // Start drawing new shape
+        this.selectedShape = null;
         this.isDrawing = true;
-        this.startPoint = this.snapPoint({ x: canvasX, y: canvasY });
+        this.startPoint = point;
         this.currentPoint = this.startPoint;
     }
 
     onMouseMove(event, canvasX, canvasY) {
-        if (!this.isDrawing) return;
+        const point = this.snapPoint({ x: canvasX, y: canvasY });
 
-        this.currentPoint = this.snapPoint({ x: canvasX, y: canvasY });
-        this.drawPreview();
+        // Handle dragging a handle
+        if (this.dragHandle) {
+            this.resizeShape(this.selectedShape, this.dragHandle, point);
+            this.redrawShapes();
+            return;
+        }
+
+        // Handle moving selected shape
+        if (this.isEditMode && this.selectedShape && this.startPoint) {
+            const dx = point.x - this.startPoint.x;
+            const dy = point.y - this.startPoint.y;
+            this.moveShape(this.selectedShape, dx, dy);
+            this.startPoint = point;
+            this.redrawShapes();
+            return;
+        }
+
+        // Handle drawing new shape
+        if (!this.isDrawing) return;
+        this.currentPoint = point;
+        this.redrawShapes();
     }
 
     onMouseUp(event, canvasX, canvasY) {
+        if (this.dragHandle) {
+            this.dragHandle = null;
+            return;
+        }
+
+        if (this.isEditMode) {
+            this.isEditMode = false;
+            this.startPoint = null;
+            return;
+        }
+
         if (!this.isDrawing) return;
 
         this.isDrawing = false;
         this.currentPoint = this.snapPoint({ x: canvasX, y: canvasY });
 
-        // Draw final shape
-        this.drawShape(this.startPoint, this.currentPoint, false);
+        // Create and store vector shape
+        const shape = this.createVectorShape(this.startPoint, this.currentPoint);
+        if (shape) {
+            this.vectorShapes.push(shape);
+            this.redrawShapes();
+        }
 
         // Reset
         this.startPoint = null;
@@ -253,80 +365,285 @@ class ShapeToolsPlugin extends BasePlugin {
         };
     }
 
-    drawPreview() {
-        if (!this.ctx || !this.startPoint || !this.currentPoint) return;
+    createVectorShape(start, end) {
+        if (!start || !end) return null;
 
-        // This would need integration with canvas redraw mechanism
-        // For now, just draw the preview shape
-        this.drawShape(this.startPoint, this.currentPoint, true);
+        return {
+            type: this.settings.currentShape,
+            start: { ...start },
+            end: { ...end },
+            strokeColor: this.settings.strokeColor,
+            strokeWidth: this.settings.strokeWidth,
+            fillColor: this.settings.fillColor,
+            fillEnabled: this.settings.fillEnabled,
+            id: Date.now() + Math.random()
+        };
     }
 
-    drawShape(start, end, isPreview = false) {
+    redrawShapes() {
         if (!this.ctx) return;
+
+        // Request canvas redraw from main app
+        if (window.redrawCanvas) {
+            window.redrawCanvas();
+        }
+
+        // Draw all stored vector shapes
+        this.vectorShapes.forEach(shape => {
+            this.drawVectorShape(shape, false);
+        });
+
+        // Draw preview of shape being drawn
+        if (this.isDrawing && this.startPoint && this.currentPoint) {
+            const previewShape = this.createVectorShape(this.startPoint, this.currentPoint);
+            if (previewShape) {
+                previewShape.strokeColor = 'rgba(0, 123, 255, 0.7)';
+                this.drawVectorShape(previewShape, true);
+            }
+        }
+
+        // Draw selection handles if shape is selected
+        if (this.selectedShape) {
+            this.drawSelectionHandles(this.selectedShape);
+        }
+    }
+
+    drawVectorShape(shape, isPreview = false) {
+        if (!this.ctx || !shape) return;
 
         this.ctx.save();
 
         // Set styles
-        this.ctx.strokeStyle = isPreview ? 'rgba(0, 123, 255, 0.5)' : this.settings.strokeColor;
-        this.ctx.lineWidth = this.settings.strokeWidth;
-        this.ctx.fillStyle = this.settings.fillColor;
+        this.ctx.strokeStyle = shape.strokeColor;
+        this.ctx.lineWidth = shape.strokeWidth;
+        this.ctx.fillStyle = shape.fillColor;
 
         // Draw based on shape type
-        switch (this.settings.currentShape) {
+        switch (shape.type) {
             case 'rectangle':
-                this.drawRectangle(start, end);
+                this.drawRectangle(shape.start, shape.end, shape.fillEnabled);
                 break;
             case 'circle':
-                this.drawCircle(start, end);
+                this.drawCircle(shape.start, shape.end, shape.fillEnabled);
                 break;
             case 'ellipse':
-                this.drawEllipse(start, end);
+                this.drawEllipse(shape.start, shape.end, shape.fillEnabled);
                 break;
             case 'triangle':
-                this.drawTriangle(start, end);
+                this.drawTriangle(shape.start, shape.end, shape.fillEnabled);
                 break;
             case 'arrow':
-                this.drawArrow(start, end);
+                this.drawArrow(shape.start, shape.end);
                 break;
             case 'line':
-                this.drawLine(start, end);
+                this.drawLine(shape.start, shape.end);
                 break;
             case 'star':
-                this.drawStar(start, end);
+                this.drawStar(shape.start, shape.end, shape.fillEnabled);
                 break;
             case 'pentagon':
-                this.drawPolygon(start, end, 5);
+                this.drawPolygon(shape.start, shape.end, 5, shape.fillEnabled);
                 break;
             case 'hexagon':
-                this.drawPolygon(start, end, 6);
+                this.drawPolygon(shape.start, shape.end, 6, shape.fillEnabled);
                 break;
         }
 
         this.ctx.restore();
     }
 
-    drawRectangle(start, end) {
+    drawSelectionHandles(shape) {
+        if (!this.ctx || !shape) return;
+
+        const handles = this.getShapeHandles(shape);
+
+        this.ctx.save();
+        this.ctx.fillStyle = '#0077ff';
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+
+        handles.forEach(handle => {
+            this.ctx.beginPath();
+            this.ctx.arc(handle.x, handle.y, 6, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.stroke();
+        });
+
+        // Draw bounding box
+        const bounds = this.getShapeBounds(shape);
+        this.ctx.strokeStyle = '#0077ff';
+        this.ctx.lineWidth = 1;
+        this.ctx.setLineDash([5, 5]);
+        this.ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+        this.ctx.setLineDash([]);
+
+        this.ctx.restore();
+    }
+
+    getShapeHandles(shape) {
+        const bounds = this.getShapeBounds(shape);
+        return [
+            { x: bounds.x, y: bounds.y, position: 'nw' },
+            { x: bounds.x + bounds.width, y: bounds.y, position: 'ne' },
+            { x: bounds.x + bounds.width, y: bounds.y + bounds.height, position: 'se' },
+            { x: bounds.x, y: bounds.y + bounds.height, position: 'sw' }
+        ];
+    }
+
+    getShapeBounds(shape) {
+        const minX = Math.min(shape.start.x, shape.end.x);
+        const minY = Math.min(shape.start.y, shape.end.y);
+        const maxX = Math.max(shape.start.x, shape.end.x);
+        const maxY = Math.max(shape.start.y, shape.end.y);
+
+        return {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+        };
+    }
+
+    getHandleAtPoint(point) {
+        if (!this.selectedShape) return null;
+
+        const handles = this.getShapeHandles(this.selectedShape);
+        const hitDistance = 10;
+
+        for (const handle of handles) {
+            const dx = point.x - handle.x;
+            const dy = point.y - handle.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= hitDistance) {
+                return handle;
+            }
+        }
+
+        return null;
+    }
+
+    getShapeAtPoint(point) {
+        // Check in reverse order (top to bottom)
+        for (let i = this.vectorShapes.length - 1; i >= 0; i--) {
+            const shape = this.vectorShapes[i];
+            const bounds = this.getShapeBounds(shape);
+
+            // Expand bounds slightly for easier selection
+            const padding = 10;
+            if (point.x >= bounds.x - padding &&
+                point.x <= bounds.x + bounds.width + padding &&
+                point.y >= bounds.y - padding &&
+                point.y <= bounds.y + bounds.height + padding) {
+                return shape;
+            }
+        }
+
+        return null;
+    }
+
+    moveShape(shape, dx, dy) {
+        if (!shape) return;
+
+        shape.start.x += dx;
+        shape.start.y += dy;
+        shape.end.x += dx;
+        shape.end.y += dy;
+    }
+
+    resizeShape(shape, handle, newPoint) {
+        if (!shape || !handle) return;
+
+        // Update the corner based on which handle is being dragged
+        switch (handle.position) {
+            case 'nw':
+                shape.start.x = newPoint.x;
+                shape.start.y = newPoint.y;
+                break;
+            case 'ne':
+                shape.end.x = newPoint.x;
+                shape.start.y = newPoint.y;
+                break;
+            case 'se':
+                shape.end.x = newPoint.x;
+                shape.end.y = newPoint.y;
+                break;
+            case 'sw':
+                shape.start.x = newPoint.x;
+                shape.end.y = newPoint.y;
+                break;
+        }
+    }
+
+    // Export shapes for LLM (rasterize to image)
+    rasterizeShapes(targetCtx) {
+        if (!targetCtx) return;
+
+        this.vectorShapes.forEach(shape => {
+            const savedCtx = this.ctx;
+            this.ctx = targetCtx;
+            this.drawVectorShape(shape, false);
+            this.ctx = savedCtx;
+        });
+    }
+
+    // Get vector data for storage
+    getVectorData() {
+        return {
+            shapes: this.vectorShapes,
+            version: '2.0'
+        };
+    }
+
+    // Load vector data from storage
+    loadVectorData(data) {
+        if (data && data.shapes) {
+            this.vectorShapes = data.shapes;
+            this.redrawShapes();
+        }
+    }
+
+    // Clear all shapes
+    clearShapes() {
+        this.vectorShapes = [];
+        this.selectedShape = null;
+        this.redrawShapes();
+    }
+
+    // Delete selected shape
+    deleteSelectedShape() {
+        if (this.selectedShape) {
+            const index = this.vectorShapes.indexOf(this.selectedShape);
+            if (index > -1) {
+                this.vectorShapes.splice(index, 1);
+                this.selectedShape = null;
+                this.redrawShapes();
+            }
+        }
+    }
+
+    drawRectangle(start, end, fillEnabled) {
         const width = end.x - start.x;
         const height = end.y - start.y;
 
         this.ctx.beginPath();
         this.ctx.rect(start.x, start.y, width, height);
-        if (this.settings.fillEnabled) this.ctx.fill();
+        if (fillEnabled) this.ctx.fill();
         this.ctx.stroke();
     }
 
-    drawCircle(start, end) {
+    drawCircle(start, end, fillEnabled) {
         const radius = Math.sqrt(
             Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
         );
 
         this.ctx.beginPath();
         this.ctx.arc(start.x, start.y, radius, 0, Math.PI * 2);
-        if (this.settings.fillEnabled) this.ctx.fill();
+        if (fillEnabled) this.ctx.fill();
         this.ctx.stroke();
     }
 
-    drawEllipse(start, end) {
+    drawEllipse(start, end, fillEnabled) {
         const radiusX = Math.abs(end.x - start.x);
         const radiusY = Math.abs(end.y - start.y);
         const centerX = (start.x + end.x) / 2;
@@ -334,11 +651,11 @@ class ShapeToolsPlugin extends BasePlugin {
 
         this.ctx.beginPath();
         this.ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-        if (this.settings.fillEnabled) this.ctx.fill();
+        if (fillEnabled) this.ctx.fill();
         this.ctx.stroke();
     }
 
-    drawTriangle(start, end) {
+    drawTriangle(start, end, fillEnabled) {
         const width = end.x - start.x;
         const height = end.y - start.y;
 
@@ -347,7 +664,7 @@ class ShapeToolsPlugin extends BasePlugin {
         this.ctx.lineTo(start.x + width, start.y + height);
         this.ctx.lineTo(start.x, start.y + height);
         this.ctx.closePath();
-        if (this.settings.fillEnabled) this.ctx.fill();
+        if (fillEnabled) this.ctx.fill();
         this.ctx.stroke();
     }
 
@@ -383,7 +700,7 @@ class ShapeToolsPlugin extends BasePlugin {
         this.ctx.stroke();
     }
 
-    drawStar(start, end) {
+    drawStar(start, end, fillEnabled) {
         const centerX = (start.x + end.x) / 2;
         const centerY = (start.y + end.y) / 2;
         const radius = Math.sqrt(
@@ -403,11 +720,11 @@ class ShapeToolsPlugin extends BasePlugin {
             }
         }
         this.ctx.closePath();
-        if (this.settings.fillEnabled) this.ctx.fill();
+        if (fillEnabled) this.ctx.fill();
         this.ctx.stroke();
     }
 
-    drawPolygon(start, end, sides) {
+    drawPolygon(start, end, sides, fillEnabled) {
         const centerX = (start.x + end.x) / 2;
         const centerY = (start.y + end.y) / 2;
         const radius = Math.sqrt(
@@ -426,7 +743,7 @@ class ShapeToolsPlugin extends BasePlugin {
             }
         }
         this.ctx.closePath();
-        if (this.settings.fillEnabled) this.ctx.fill();
+        if (fillEnabled) this.ctx.fill();
         this.ctx.stroke();
     }
 
