@@ -11,7 +11,7 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, 'static/index.html')
+        main: path.resolve(__dirname, 'templates/index.html')
       }
     }
   },
