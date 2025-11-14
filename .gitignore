@@ -43,3 +43,8 @@ ENV/
 *.sqlite3
 server.log
 server.log
+server.log
+*.log
+server.log
+server.log
+*.pyc
