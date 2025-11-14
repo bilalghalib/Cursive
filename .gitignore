@@ -41,10 +41,10 @@ ENV/
 *.db
 *.sqlite
 *.sqlite3
-server.log
-server.log
-server.log
+
+# Logs
 *.log
 server.log
-server.log
-*.pyc
+
+# Auto-generated files
+static/js/version.js
