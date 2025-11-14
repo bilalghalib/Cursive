@@ -40,13 +40,5 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
 
-[edge_functions]
-enabled = true
-
-[[edge_functions.custom]]
-name = "claude-proxy"
-verify_jwt = true
-
-[[edge_functions.custom]]
-name = "stripe-webhook"
-verify_jwt = false
+# Edge Functions are auto-detected from supabase/functions/ directory
+# No additional configuration needed
