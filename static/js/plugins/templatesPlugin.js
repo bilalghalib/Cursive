@@ -6,6 +6,7 @@
  */
 
 import { BasePlugin } from '../pluginManager.js';
+import { setBackgroundTemplate, toggleBackgroundTemplate, isBackgroundTemplateEnabled } from '../canvasManager.js';
 
 class TemplatesPlugin extends BasePlugin {
     constructor() {
@@ -127,6 +128,12 @@ class TemplatesPlugin extends BasePlugin {
             </div>
 
             <div class="template-options" style="margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <button id="template-toggle-btn" style="padding: 8px 16px; flex: 1; cursor: pointer; border-radius: 4px; border: 2px solid #007bff; background: ${isBackgroundTemplateEnabled() ? '#007bff' : 'white'}; color: ${isBackgroundTemplateEnabled() ? 'white' : '#007bff'}; font-weight: bold;">
+                        <i class="fas fa-${isBackgroundTemplateEnabled() ? 'eye' : 'eye-slash'}"></i>
+                        ${isBackgroundTemplateEnabled() ? 'Hide Background' : 'Show Background'}
+                    </button>
+                </div>
                 <label style="display: flex; align-items: center; gap: 8px;">
                     <span>Opacity:</span>
                     <input type="range" id="template-opacity" min="0" max="100"
@@ -167,6 +174,18 @@ class TemplatesPlugin extends BasePlugin {
     }
 
     attachTemplatePanelListeners() {
+        // Toggle button
+        const toggleBtn = document.getElementById('template-toggle-btn');
+        toggleBtn.addEventListener('click', () => {
+            const isEnabled = toggleBackgroundTemplate();
+            toggleBtn.style.background = isEnabled ? '#007bff' : 'white';
+            toggleBtn.style.color = isEnabled ? 'white' : '#007bff';
+            toggleBtn.innerHTML = `
+                <i class="fas fa-${isEnabled ? 'eye' : 'eye-slash'}"></i>
+                ${isEnabled ? 'Hide Background' : 'Show Background'}
+            `;
+        });
+
         // Template cards
         document.querySelectorAll('.template-card').forEach(card => {
             card.addEventListener('click', () => {
@@ -218,314 +237,17 @@ class TemplatesPlugin extends BasePlugin {
     }
 
     applyTemplate(templateKey) {
-        if (!this.ctx) {
-            console.error('Canvas context not available');
-            return;
-        }
-
         this.currentTemplate = templateKey;
 
-        // Clear previous template layer
-        // In a real implementation, you'd want a separate layer for templates
-
-        switch (templateKey) {
-            case 'blank':
-                this.applyBlank();
-                break;
-            case 'grid':
-                this.applyGrid();
-                break;
-            case 'lines':
-                this.applyLines();
-                break;
-            case 'dots':
-                this.applyDots();
-                break;
-            case 'music':
-                this.applyMusicStaff();
-                break;
-            case 'calendar':
-                this.applyCalendar();
-                break;
-            case 'cornell':
-                this.applyCornellNotes();
-                break;
-            case 'storyboard':
-                this.applyStoryboard();
-                break;
-            case 'kanban':
-                this.applyKanban();
-                break;
-            case 'mindmap':
-                this.applyMindMap();
-                break;
-        }
+        // Use the new background template system
+        setBackgroundTemplate(templateKey, {
+            templateOpacity: this.settings.templateOpacity,
+            gridSpacing: this.settings.gridSpacing,
+            lineSpacing: this.settings.lineSpacing,
+            dotSpacing: this.settings.dotSpacing
+        });
 
         console.log(`Template applied: ${templateKey}`);
-    }
-
-    applyBlank() {
-        // Clear canvas
-        if (this.ctx && this.canvas) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        }
-    }
-
-    applyGrid() {
-        const spacing = this.settings.gridSpacing;
-        const width = this.canvas.width;
-        const height = this.canvas.height;
-
-        this.ctx.save();
-        this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity})`;
-        this.ctx.lineWidth = 1;
-
-        // Vertical lines
-        for (let x = 0; x < width; x += spacing) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, height);
-            this.ctx.stroke();
-        }
-
-        // Horizontal lines
-        for (let y = 0; y < height; y += spacing) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(width, y);
-            this.ctx.stroke();
-        }
-
-        this.ctx.restore();
-    }
-
-    applyLines() {
-        const spacing = this.settings.lineSpacing;
-        const width = this.canvas.width;
-        const height = this.canvas.height;
-
-        this.ctx.save();
-        this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity})`;
-        this.ctx.lineWidth = 1;
-
-        for (let y = spacing; y < height; y += spacing) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(width, y);
-            this.ctx.stroke();
-        }
-
-        this.ctx.restore();
-    }
-
-    applyDots() {
-        const spacing = this.settings.dotSpacing;
-        const width = this.canvas.width;
-        const height = this.canvas.height;
-
-        this.ctx.save();
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity})`;
-
-        for (let x = spacing; x < width; x += spacing) {
-            for (let y = spacing; y < height; y += spacing) {
-                this.ctx.beginPath();
-                this.ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-                this.ctx.fill();
-            }
-        }
-
-        this.ctx.restore();
-    }
-
-    applyMusicStaff() {
-        const staffHeight = 100;
-        const lineSpacing = 15;
-        const marginTop = 50;
-        const width = this.canvas.width;
-
-        this.ctx.save();
-        this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity})`;
-        this.ctx.lineWidth = 1;
-
-        // Draw multiple staffs
-        for (let staffY = marginTop; staffY < this.canvas.height - staffHeight; staffY += staffHeight + 50) {
-            // Draw 5 lines for each staff
-            for (let i = 0; i < 5; i++) {
-                const y = staffY + i * lineSpacing;
-                this.ctx.beginPath();
-                this.ctx.moveTo(0, y);
-                this.ctx.lineTo(width, y);
-                this.ctx.stroke();
-            }
-        }
-
-        this.ctx.restore();
-    }
-
-    applyCalendar() {
-        const cols = 7;
-        const rows = 5;
-        const cellWidth = this.canvas.width / cols;
-        const cellHeight = (this.canvas.height - 50) / rows;
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-        this.ctx.save();
-        this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity})`;
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity * 2})`;
-        this.ctx.lineWidth = 2;
-        this.ctx.font = '14px Arial';
-
-        // Draw header
-        days.forEach((day, i) => {
-            const x = i * cellWidth;
-            this.ctx.fillText(day, x + 10, 25);
-        });
-
-        // Draw grid
-        for (let i = 0; i <= cols; i++) {
-            const x = i * cellWidth;
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 40);
-            this.ctx.lineTo(x, this.canvas.height);
-            this.ctx.stroke();
-        }
-
-        for (let i = 0; i <= rows; i++) {
-            const y = 40 + i * cellHeight;
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.canvas.width, y);
-            this.ctx.stroke();
-        }
-
-        this.ctx.restore();
-    }
-
-    applyCornellNotes() {
-        const cueWidth = this.canvas.width * 0.3;
-        const summaryHeight = this.canvas.height * 0.2;
-
-        this.ctx.save();
-        this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity})`;
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity * 2})`;
-        this.ctx.lineWidth = 2;
-        this.ctx.font = 'bold 16px Arial';
-
-        // Vertical divider
-        this.ctx.beginPath();
-        this.ctx.moveTo(cueWidth, 0);
-        this.ctx.lineTo(cueWidth, this.canvas.height - summaryHeight);
-        this.ctx.stroke();
-
-        // Horizontal divider
-        this.ctx.beginPath();
-        this.ctx.moveTo(0, this.canvas.height - summaryHeight);
-        this.ctx.lineTo(this.canvas.width, this.canvas.height - summaryHeight);
-        this.ctx.stroke();
-
-        // Labels
-        this.ctx.fillText('Cues', 10, 30);
-        this.ctx.fillText('Notes', cueWidth + 10, 30);
-        this.ctx.fillText('Summary', 10, this.canvas.height - summaryHeight + 30);
-
-        this.ctx.restore();
-    }
-
-    applyStoryboard() {
-        const cols = 3;
-        const rows = 2;
-        const cellWidth = (this.canvas.width - 40) / cols;
-        const cellHeight = (this.canvas.height - 40) / rows;
-        const margin = 20;
-
-        this.ctx.save();
-        this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity})`;
-        this.ctx.lineWidth = 2;
-
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                const x = margin + col * cellWidth;
-                const y = margin + row * cellHeight;
-
-                this.ctx.strokeRect(x, y, cellWidth - 10, cellHeight - 10);
-            }
-        }
-
-        this.ctx.restore();
-    }
-
-    applyKanban() {
-        const cols = 3;
-        const colWidth = this.canvas.width / cols;
-        const labels = ['To Do', 'In Progress', 'Done'];
-
-        this.ctx.save();
-        this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity})`;
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity * 2})`;
-        this.ctx.lineWidth = 2;
-        this.ctx.font = 'bold 18px Arial';
-
-        for (let i = 0; i <= cols; i++) {
-            const x = i * colWidth;
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.canvas.height);
-            this.ctx.stroke();
-        }
-
-        // Header line
-        this.ctx.beginPath();
-        this.ctx.moveTo(0, 50);
-        this.ctx.lineTo(this.canvas.width, 50);
-        this.ctx.stroke();
-
-        // Labels
-        labels.forEach((label, i) => {
-            const x = i * colWidth + colWidth / 2;
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(label, x, 30);
-        });
-
-        this.ctx.restore();
-    }
-
-    applyMindMap() {
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
-        const radius = 60;
-        const branches = 6;
-
-        this.ctx.save();
-        this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.settings.templateOpacity})`;
-        this.ctx.fillStyle = `rgba(0, 123, 255, ${this.settings.templateOpacity})`;
-        this.ctx.lineWidth = 2;
-
-        // Central circle
-        this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        this.ctx.fill();
-        this.ctx.stroke();
-
-        // Branch lines
-        for (let i = 0; i < branches; i++) {
-            const angle = (i * 2 * Math.PI) / branches;
-            const x = centerX + Math.cos(angle) * 200;
-            const y = centerY + Math.sin(angle) * 200;
-
-            this.ctx.beginPath();
-            this.ctx.moveTo(centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius);
-            this.ctx.lineTo(x, y);
-            this.ctx.stroke();
-
-            // Branch circles
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, 40, 0, Math.PI * 2);
-            this.ctx.fillStyle = `rgba(100, 200, 100, ${this.settings.templateOpacity})`;
-            this.ctx.fill();
-            this.ctx.stroke();
-        }
-
-        this.ctx.restore();
     }
 
     saveCurrentAsTemplate() {
