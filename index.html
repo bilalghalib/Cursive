@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
+        <title>AI Notebook - Infinite Canvas</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Caveat&family=Indie+Flower&family=Dancing+Script&display=swap">
+        <link rel="stylesheet" href="/static/css/styles.css">
+    </head>
+    <body>
+        <div id="toolbar">
+        <div class="toolbar-section drawing-tools">
+            <!-- Drawing tools group -->
+            <button id="draw-btn" class="active" title="Draw"><i class="fas fa-pencil-alt"></i></button>
+            <button id="select-btn" title="Select to Chat"><i class="fas fa-vector-square"></i></button>
+            <button id="pan-btn" title="Pan Canvas"><i class="fas fa-hand-paper"></i></button>
+            <button id="zoom-btn" title="Zoom"><i class="fas fa-search"></i></button>
+        </div>
+
+        <div class="toolbar-section history-tools">
+            <!-- History controls -->
+            <button id="undo-btn" title="Undo"><i class="fas fa-undo"></i></button>
+            <button id="redo-btn" title="Redo"><i class="fas fa-redo"></i></button>
+        </div>
+
+        <div class="toolbar-section content-tools">
+            <!-- Content tools -->
+            <button id="prompt-btn" title="Get a Writing Prompt"><i class="fas fa-lightbulb"></i> Prompt</button>
+            <button id="new-session-btn" title="Clear Canvas and Start Fresh"><i class="fas fa-trash-alt"></i> Clear All</button>
+        </div>
+
+        <div class="toolbar-section app-tools">
+            <!-- App controls -->
+            <button id="theme-toggle" title="Toggle Dark/Light Mode"><i class="fas fa-moon"></i></button>
+            <button id="notebook-btn" title="View Notebooks"><i class="fas fa-book"></i></button>
+            <button id="export-btn" title="Export Options"><i class="fas fa-download"></i></button>
+        </div>
+    </div>
+
+        <!-- Selection rectangle (for handwriting selection) -->
+        <div id="selection-box"></div>
+
+        <!-- Main canvas -->
+        <canvas id="canvas"></canvas>
+
+        <!-- Bottom-right buttons -->
+        <div class="bottom-right-buttons">
+            <button id="show-conversations-btn" title="View Conversations"><i class="fas fa-comments"></i></button>
+        </div>
+
+        <!-- Conversations sidebar -->
+        <div id="conversations-sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fas fa-comments"></i> Conversations</h3>
+                <button id="close-conversations-btn" class="close-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="conversations-list"></div>
+        </div>
+
+        <!-- Chat sidebar -->
+        <div id="chat-sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fas fa-comment-dots"></i> AI Chat</h3>
+                <button id="close-chat-btn" class="close-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="chat-messages"></div>
+            <div class="chat-input-container">
+                <input type="text" id="chat-input" placeholder="Type your message...">
+                <button id="send-btn"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+
+        <!-- Notebook list modal -->
+        <div id="notebook-modal" class="modal">
+            <div class="modal-content notebook-modal-content">
+                <h2>My Notebooks</h2>
+                <button id="close-notebook-modal" class="close-btn"><i class="fas fa-times"></i></button>
+
+                <div class="notebook-actions">
+                    <button id="create-notebook-btn"><i class="fas fa-plus"></i> New Notebook</button>
+                    <button id="import-notebook-btn"><i class="fas fa-file-import"></i> Import Notebook</button>
+                </div>
+
+                <input type="text" id="notebook-search" placeholder="Search notebooks...">
+
+                <div id="notebook-list"></div>
+            </div>
+        </div>
+
+        <!-- Export modal -->
+        <div id="export-modal" class="modal">
+            <div class="modal-content">
+                <h2>Export Options</h2>
+                <button id="close-export-modal" class="close-btn"><i class="fas fa-times"></i></button>
+
+                <button id="export-pdf-btn" class="export-option">
+                    <i class="fas fa-file-pdf"></i> Export as PDF
+                </button>
+                <button id="export-json-btn" class="export-option">
+                    <i class="fas fa-file-code"></i> Export as JSON
+                </button>
+                <button id="save-to-web-btn" class="export-option">
+                    <i class="fas fa-globe"></i> Save to Web (Shareable Link)
+                </button>
+            </div>
+        </div>
+
+        <!-- Shared page URL modal -->
+        <div id="share-modal" class="modal">
+            <div class="modal-content">
+                <h2>Shareable Link Created!</h2>
+                <button id="close-share-modal" class="close-btn"><i class="fas fa-times"></i></button>
+
+                <p>Your page is now available at:</p>
+                <div class="url-display">
+                    <input type="text" id="share-url" readonly>
+                    <button id="copy-url-btn"><i class="fas fa-copy"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plugin container (for plugin UIs) -->
+        <div id="plugin-container"></div>
+
+        <!-- Load JavaScript modules -->
+        <script type="module" src="/static/js/version.js"></script>
+        <script type="module" src="/static/js/config.js"></script>
+        <script type="module" src="/static/js/app.js"></script>
+    </body>
+</html>
