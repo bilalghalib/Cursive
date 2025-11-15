@@ -1,23 +1,16 @@
-/**
- * Simple HTTP server for Cursive (replaces Flask)
- * Serves static files only - all logic moved to Supabase
- */
-
-import http from 'http';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { createServer } from 'http';
+import { readFile } from 'fs/promises';
+import { extname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5022;
-const HOST = process.env.HOST || '0.0.0.0'; // bind to all interfaces for LAN access
-const BASE_DIR = __dirname;
+const PORT = process.env.PORT || 8080;
+const HOST = '0.0.0.0'; // Bind to all interfaces for iPad access
 
-const MIME_TYPES = {
+const mimeTypes = {
   '.html': 'text/html',
   '.js': 'text/javascript',
   '.css': 'text/css',
@@ -27,95 +20,54 @@ const MIME_TYPES = {
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
-  '.yaml': 'text/yaml',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.yaml': 'text/yaml'
 };
 
-const server = http.createServer((req, res) => {
+const server = createServer(async (req, res) => {
   console.log(`${req.method} ${req.url}`);
 
   // Parse URL
   let filePath = req.url === '/' ? '/index.html' : req.url;
-
+  
   // Remove query string
   filePath = filePath.split('?')[0];
 
-  // Security: prevent directory traversal
-  if (filePath.includes('..')) {
-    res.writeHead(403);
-    res.end('Forbidden');
-    return;
-  }
-
-  // Map paths
-  if (filePath.startsWith('/static/')) {
-    filePath = filePath;  // Already correct
-  } else if (filePath === '/index.html' || filePath === '/') {
-    filePath = '/index.html';
-  } else if (filePath.startsWith('/pages/')) {
-    // Serve shared pages
-    filePath = filePath;
-  } else if (filePath.endsWith('.html')) {
-    // HTML files in root directory (handwriting-trainer.html, handwriting-test.html, etc.)
-    filePath = filePath;  // Keep as-is
+  // Determine file path
+  let fullPath;
+  if (filePath.startsWith('/css/') || filePath.startsWith('/js/') || filePath.startsWith('/config/')) {
+    fullPath = join(__dirname, 'static', filePath);
   } else {
-    // Try as static file
-    filePath = '/static' + filePath;
+    fullPath = join(__dirname, filePath);
   }
 
-  const fullPath = path.join(BASE_DIR, filePath);
-  const ext = path.extname(fullPath);
-  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-  // Read and serve file
-  fs.readFile(fullPath, (err, data) => {
-    if (err) {
-      if (err.code === 'ENOENT') {
-        // File not found - serve index.html for SPA
-        fs.readFile(path.join(BASE_DIR, 'index.html'), (err, data) => {
-          if (err) {
-            res.writeHead(500);
-            res.end('Server error');
-            return;
-          }
-          res.writeHead(200, {
-            'Content-Type': 'text/html',
-            'Cache-Control': 'no-store, no-cache, must-revalidate'
-          });
-          res.end(data);
-        });
-      } else {
-        res.writeHead(500);
-        res.end('Server error');
-      }
-      return;
-    }
-
-    // Serve file with no-cache headers
-    res.writeHead(200, {
+  try {
+    const data = await readFile(fullPath);
+    const ext = extname(fullPath);
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    
+    res.writeHead(200, { 
       'Content-Type': contentType,
-      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-      'Pragma': 'no-cache',
-      'Expires': '0'
+      'Access-Control-Allow-Origin': '*'
     });
     res.end(data);
-  });
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('404 Not Found');
+    } else {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('500 Internal Server Error');
+    }
+  }
 });
 
 server.listen(PORT, HOST, () => {
-  const localUrl = `http://localhost:${PORT}`;
-  const networkUrl = HOST === '0.0.0.0' ? `http://${getLocalIP()}:${PORT}` : `http://${HOST}:${PORT}`;
-  console.log(`✅ Cursive server running on ${localUrl}`);
-  if (HOST === '0.0.0.0') {
-    console.log(`🌐 Accessible on your network at ${networkUrl}`);
-  } else {
-    console.log(`🌐 Server bound to host ${HOST}`);
-  }
-  console.log(`📁 Serving static files from ${BASE_DIR}`);
-  console.log(`🔌 Connected to Supabase cloud database`);
+  console.log(`\n🚀 Cursive is running!`);
+  console.log(`\n📱 Local:     http://localhost:${PORT}`);
+  console.log(`📱 Network:   http://0.0.0.0:${PORT}`);
+  console.log(`\n💡 To access from iPad:`);
+  console.log(`   1. Find your computer's IP address (ifconfig or ipconfig)`);
+  console.log(`   2. Open http://YOUR_IP:${PORT} on your iPad\n`);
 });
-
-function getLocalIP() {
-  const interfaces = Object.values(os.networkInterfaces()).flat();
-  const lan = interfaces.find(iface => iface && iface.family === 'IPv4' && !iface.internal);
-  return lan ? lan.address : 'your-local-ip';
-}

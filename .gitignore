@@ -1,6 +1,7 @@
 
 static/js/.DS_Store
 static/.DS_Store
+static/js/env.js
 .env
 
 # Node/TypeScript
