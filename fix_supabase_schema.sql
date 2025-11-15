@@ -72,10 +72,12 @@ END $$;
 -- STEP 3: Enable RLS on tables (if not already enabled)
 -- ============================================================================
 
-ALTER TABLE notebooks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE drawings ENABLE ROW LEVEL SECURITY;
-
-RAISE NOTICE 'RLS enabled on notebooks and drawings tables';
+DO $$
+BEGIN
+    ALTER TABLE notebooks ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE drawings ENABLE ROW LEVEL SECURITY;
+    RAISE NOTICE 'RLS enabled on notebooks and drawings tables';
+END $$;
 
 -- ============================================================================
 -- STEP 4: Drop existing policies (if any) and recreate them
