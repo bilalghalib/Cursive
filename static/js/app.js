@@ -1580,12 +1580,16 @@ async function handleEtchToCanvas() {
         }
         
         // Draw the handwriting on the canvas with animation - adjust position based on current view
+        const canvasScale = getCanvasScale();
+        const canvasPanX = getCanvasPanX();
+        const canvasPanY = getCanvasPanY();
+
         await drawHandwritingOnCanvas(
             lastAIMessage.content,
-            centerX / scale - panX / scale, // Convert to canvas coordinates
-            centerY / scale - panY / scale,
+            centerX / canvasScale - canvasPanX / canvasScale, // Convert to canvas coordinates
+            centerY / canvasScale - canvasPanY / canvasScale,
             600, // Max width
-            { 
+            {
                 style: currentStyle,
                 animationDelay: true, // Use animation for etching to canvas
                 consistentStyle: true

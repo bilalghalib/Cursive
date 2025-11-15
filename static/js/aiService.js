@@ -56,7 +56,14 @@ export async function sendImageToAI(imageData) {
 export async function sendChatToAI(chatHistory, onProgress = null) {
   try {
     const config = await getConfig();
-    
+
+    // Filter out any messages with empty content (Claude API requires non-empty content)
+    const validMessages = chatHistory.filter(msg => msg.content && msg.content.trim() !== '');
+
+    if (validMessages.length === 0) {
+      throw new Error('No valid messages to send to AI');
+    }
+
     // If no progress callback is provided, use the standard non-streaming approach
     if (!onProgress) {
       const response = await fetch(EDGE_FUNCTIONS.claudeProxy, {
@@ -68,7 +75,7 @@ export async function sendChatToAI(chatHistory, onProgress = null) {
         body: JSON.stringify({
           model: config.claude.model,
           max_tokens: config.claude.max_tokens,
-          messages: chatHistory
+          messages: validMessages
         })
       });
       
@@ -91,7 +98,7 @@ export async function sendChatToAI(chatHistory, onProgress = null) {
         body: JSON.stringify({
           model: config.claude.model,
           max_tokens: config.claude.max_tokens,
-          messages: chatHistory,
+          messages: validMessages,
           stream: true
         })
       });
