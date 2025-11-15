@@ -1,12 +1,12 @@
 # Apply Supabase Migration
 
 ## Problem
-The "save to web" feature is failing with 400 errors because the database tables don't exist yet in Supabase.
+The "save to web" feature is failing with 400 errors. The tables exist but may be missing columns or have incorrect RLS policies.
 
 ## Solution
-You need to apply the migration SQL to create the required tables in your Supabase database.
+First diagnose what's missing, then apply the fix.
 
-## Option 1: Using Supabase SQL Editor (Recommended)
+## Step 1: Diagnose the Problem (Optional but Recommended)
 
 1. **Open Supabase Dashboard**
    - Go to https://supabase.com/dashboard
@@ -16,25 +16,43 @@ You need to apply the migration SQL to create the required tables in your Supaba
    - Click on "SQL Editor" in the left sidebar
    - Click "New Query"
 
-3. **Copy and Execute the Migration**
-   - Open the file: `supabase/migrations/20251113000000_initial_schema.sql`
+3. **Run Diagnostic**
+   - Open the file: `diagnose_supabase.sql`
+   - Copy the entire contents
+   - Paste into the SQL Editor
+   - Click "Run" or press Ctrl+Enter
+   - Review the output to see what's missing
+
+## Step 2: Apply the Fix (REQUIRED)
+
+1. **In the Same SQL Editor**
+   - Click "New Query"
+
+2. **Copy and Execute the Fix**
+   - Open the file: `fix_supabase_schema.sql`
    - Copy the entire contents
    - Paste into the SQL Editor
    - Click "Run" or press Ctrl+Enter
 
-4. **Verify Tables Were Created**
+3. **Verify the Fix**
+   - You should see messages like:
+     - "Added share_id column to notebooks"
+     - "Added is_shared column to notebooks"
+     - "RLS enabled on notebooks and drawings tables"
+     - "Schema fixes applied successfully!"
+
+4. **Check Your Tables**
    - Go to "Table Editor" in the left sidebar
-   - You should now see these tables:
-     - `user_settings`
-     - `notebooks`
-     - `drawings`
-     - `api_usage`
-     - `billing`
-     - `user_handwriting` (if you also ran the handwriting schema)
+   - Click on `notebooks` table
+   - Verify these columns exist:
+     - `id`, `user_id`, `title`, `description`, `is_shared`, `share_id`, `created_at`, `updated_at`
+   - Click on `drawings` table
+   - Verify these columns exist:
+     - `id`, `notebook_id`, `stroke_data`, `transcription`, `ai_response`, `drawing_type`, `canvas_state`, `created_at`
 
-## Option 2: Using Supabase CLI
+## Alternative: Using Supabase CLI (Advanced)
 
-If you have the Supabase CLI installed:
+If you have the Supabase CLI installed and want to use migrations:
 
 ```bash
 # Install Supabase CLI (if not already installed)
@@ -43,29 +61,31 @@ npm install -g supabase
 # Link to your project
 supabase link --project-ref kfgmeonhhmchoyoklswm
 
-# Push migrations
-supabase db push
+# Apply the fix manually via SQL file
+supabase db execute --file fix_supabase_schema.sql
 ```
 
-## What This Migration Creates
+## What This Fix Does
 
-The migration will create:
+The fix script will:
 
-1. **Tables:**
-   - `user_settings` - User subscription and API key settings
-   - `notebooks` - Collections of drawings
-   - `drawings` - Individual canvas drawings with strokes
-   - `api_usage` - API usage tracking for billing
-   - `billing` - Stripe subscription information
+1. **Add Missing Columns:**
+   - `notebooks.share_id` - For creating shareable links
+   - `notebooks.is_shared` - Flag for public sharing
+   - `notebooks.description` - Notebook description
+   - `drawings.drawing_type` - Type of drawing (handwriting/typed/shape)
 
-2. **Row Level Security (RLS):**
-   - Users can only access their own data
-   - Shared notebooks are accessible to others
+2. **Create/Fix Row Level Security (RLS) Policies:**
+   - Users can view their own notebooks
+   - Users can view publicly shared notebooks
+   - Users can only modify their own notebooks
+   - Users can only modify drawings in their own notebooks
 
-3. **Functions and Triggers:**
-   - Auto-update `updated_at` timestamps
-   - Track API usage in billing
-   - Create user settings on signup
+3. **Create Triggers:**
+   - Auto-update `updated_at` timestamps on notebooks
+
+4. **Create Indexes:**
+   - Index on `share_id` for fast shared notebook lookups
 
 ## After Migration
 
@@ -76,7 +96,24 @@ Once the migration is applied, the "save to web" feature will work properly and 
 
 ## Troubleshooting
 
-If you get errors about existing objects:
-- Some tables might already exist
-- You can run individual CREATE TABLE statements from the migration file
-- Or drop existing tables first (⚠️ this will delete data!)
+### Error: "relation 'notebooks' already exists"
+✅ This is expected! The tables exist but are missing columns. Run `fix_supabase_schema.sql` instead.
+
+### Error: "column 'share_id' already exists"
+✅ This is fine! The fix script checks for existing columns and only adds missing ones.
+
+### Still getting 400 errors after running the fix?
+1. Check that you're logged in to the app (see console: "✅ User authenticated")
+2. Verify your user_id in Supabase: Go to Authentication > Users
+3. Run the diagnostic SQL to check RLS policies
+4. Try creating a test notebook manually:
+   ```sql
+   INSERT INTO notebooks (user_id, title, description, is_shared)
+   VALUES ('your-user-id-here', 'Test Notebook', 'Test', false);
+   ```
+
+### Error: "permission denied for table notebooks"
+This means RLS is enabled but policies aren't set up correctly. Re-run `fix_supabase_schema.sql`.
+
+### Error: "new row violates check constraint"
+This means a required column is missing. Re-run `fix_supabase_schema.sql`.
