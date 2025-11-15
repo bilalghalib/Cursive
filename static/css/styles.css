@@ -168,6 +168,35 @@ body {
     animation: fadeIn 0.3s;
 }
 
+/* Response modal - positioned on the right side */
+#response-modal {
+    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent background */
+}
+
+#response-modal .modal-content {
+    position: fixed;
+    right: 0;
+    top: 0;
+    margin: 0;
+    width: 500px;
+    max-width: 50vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    border-left: 1px solid var(--border-color);
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
 .modal-content {
     background-color: var(--modal-content-bg);
     margin: 5vh auto;
