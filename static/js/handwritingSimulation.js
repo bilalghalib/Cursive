@@ -82,10 +82,10 @@ export function simulateHandwriting(text, width, options = {}) {
     // Create SVG element
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", width);
-    svg.setAttribute("height", "100%");
+    svg.setAttribute("height", "600"); // Fixed: SVG height must be a number, not "100%" or "auto"
     svg.setAttribute("viewBox", `0 0 ${width} 1000`); // Large enough viewBox to accommodate text
     svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    svg.style.maxHeight = "600px"; // Limit height but allow auto-sizing
+    svg.style.maxHeight = "600px"; // Limit height
     
     let currentX = 10; // Start with some padding
     let currentY = settings.fontSize;
