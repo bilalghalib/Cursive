@@ -87,7 +87,7 @@ mv static/js/aiService.supabase.js static/js/aiService.js
 
 ```html
 <!-- Supabase Client Library -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/static/vendor/supabase-js.min.js"></script>
 ```
 
 ---

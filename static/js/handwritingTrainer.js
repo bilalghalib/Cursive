@@ -561,7 +561,7 @@ function calculateStrokeLength(points) {
 
 // Export for testing
 window.showTestPage = function() {
-    window.location.href = '/handwriting-test';
+    window.location.href = '/handwriting-test.html';
 };
 
 // Initialize when DOM is loaded

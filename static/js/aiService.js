@@ -87,7 +87,7 @@ export async function sendChatToAI(chatHistory, onProgress = null) {
       const data = await response.json();
       return data.content[0].text;
     } 
-    // If progress callback provided, use streaming approach
+    // If progress callback provided, prefer streaming but gracefully fall back to non-streaming responses
     else {
       const response = await fetch(EDGE_FUNCTIONS.claudeProxy, {
         method: 'POST',
@@ -104,8 +104,26 @@ export async function sendChatToAI(chatHistory, onProgress = null) {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`AI API streaming request failed: ${response.statusText}. Details: ${JSON.stringify(errorData)}`);
+        let errorDetails = '';
+        try {
+          const errorData = await response.clone().json();
+          errorDetails = ` Details: ${JSON.stringify(errorData)}`;
+        } catch (e) {
+          const errorText = await response.text();
+          errorDetails = ` Details: ${errorText}`;
+        }
+        throw new Error(`AI API streaming request failed: ${response.statusText}.${errorDetails}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.body || !contentType.includes('text/event-stream')) {
+        // Fallback to non-streaming response (Supabase Edge functions currently return JSON)
+        const data = await response.json();
+        const text = data?.content?.[0]?.text || '';
+        if (onProgress) {
+          onProgress(text);
+        }
+        return text;
       }
       
       const reader = response.body.getReader();
