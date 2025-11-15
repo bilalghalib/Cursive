@@ -1,35 +1,47 @@
 :root {
-    /* Light theme variables */
+    /* Light theme variables - Modern, clean palette */
     --background-color: #ffffff;
-    --surface-color: #f0f0f0;
-    --text-color: #333333;
-    --border-color: #cccccc;
-    --active-color: #e0e0e0;
-    --primary-color: #007bff;
+    --surface-color: #ffffff;
+    --surface-secondary: #f8f9fa;
+    --text-color: #1a1a1a;
+    --text-secondary: #6c757d;
+    --border-color: #e1e4e8;
+    --active-color: #f0f3f6;
+    --primary-color: #0066ff;
+    --primary-hover: #0052cc;
     --canvas-color: #ffffff;
     --ink-color: #000000;
     --modal-background: rgba(0, 0, 0, 0.4);
-    --modal-content-bg: #fefefe;
-    --spinner-color: #3498db;
+    --modal-content-bg: #ffffff;
+    --spinner-color: #0066ff;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
 }
 
 [data-theme="dark"] {
-    /* Dark theme variables */
-    --background-color: #121212;
-    --surface-color: #1e1e1e;
-    --text-color: #e0e0e0;
-    --border-color: #444444;
-    --active-color: #333333;
-    --primary-color: #4dabf7;
-    --canvas-color: #1a1a1a;
-    --ink-color: #e0e0e0;
+    /* Dark theme variables - Modern dark palette */
+    --background-color: #0d1117;
+    --surface-color: #161b22;
+    --surface-secondary: #1c2128;
+    --text-color: #e6edf3;
+    --text-secondary: #8b949e;
+    --border-color: #30363d;
+    --active-color: #21262d;
+    --primary-color: #58a6ff;
+    --primary-hover: #79c0ff;
+    --canvas-color: #0d1117;
+    --ink-color: #e6edf3;
     --modal-background: rgba(0, 0, 0, 0.7);
-    --modal-content-bg: #2c2c2c;
-    --spinner-color: #4dabf7;
+    --modal-content-bg: #161b22;
+    --spinner-color: #58a6ff;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
 }
 
 body {
-    font-family: Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
     margin: 0;
     padding: 0;
     display: flex;
@@ -39,18 +51,22 @@ body {
     background-color: var(--background-color);
     color: var(--text-color);
     transition: background-color 0.3s ease, color 0.3s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 #toolbar {
-    padding: 8px 15px;
+    padding: 12px 20px;
     background-color: var(--surface-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: background-color 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+    border-bottom: 1px solid var(--border-color);
     z-index: 100;
     position: relative;
+    backdrop-filter: blur(10px);
 }
 
 .toolbar-section {
@@ -76,23 +92,25 @@ body {
 }
 
 #toolbar button {
-    margin: 0 2px;
-    padding: 6px 10px;
-    background-color: var(--background-color);
+    margin: 0 4px;
+    padding: 8px 14px;
+    background-color: transparent;
     color: var(--text-color);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border: 1px solid transparent;
+    border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 34px;
+    height: 38px;
+    font-size: 14px;
+    font-weight: 500;
 }
 
 #toolbar button i {
     font-size: 1rem;
-    margin-right: 4px;
+    margin-right: 6px;
 }
 
 #toolbar button:only-child i,
@@ -105,11 +123,13 @@ body {
 #toolbar button.active {
     background-color: var(--active-color);
     border-color: var(--border-color);
-    color: var(--text-color);
+    color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
 }
 
 #toolbar button:hover {
     background-color: var(--active-color);
+    transform: translateY(-1px);
 }
 
 #canvas-container {
@@ -205,16 +225,17 @@ body {
 .modal-content {
     background-color: var(--modal-content-bg);
     margin: 5vh auto;
-    padding: 20px;
+    padding: 24px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 12px;
     width: 80%;
     max-width: 800px;
     max-height: 90vh;
     overflow: auto;
     color: var(--text-color);
     position: relative;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-lg);
 }
 
 .modal-header {
@@ -250,20 +271,22 @@ body {
     background-color: var(--primary-color);
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 10px 16px;
+    border-radius: 8px;
+    padding: 12px 20px;
     cursor: pointer;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 8px;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-sm);
 }
 
 .primary-button:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
+    background-color: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 .close {
@@ -290,20 +313,29 @@ body {
 }
 
 .chat-message {
-    margin-bottom: 15px;
-    padding: 12px;
-    border-radius: 8px;
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    border-radius: 12px;
     position: relative;
+    line-height: 1.6;
+    transition: all 0.2s ease;
 }
 
 .user-message {
-    background-color: var(--surface-color);
-    margin-right: 30px;
+    background-color: var(--primary-color);
+    color: white;
+    margin-right: 40px;
+    margin-left: 20px;
+    border-bottom-right-radius: 4px;
 }
 
 .ai-message {
-    background-color: var(--surface-color);
-    margin-left: 30px;
+    background-color: var(--surface-secondary);
+    color: var(--text-color);
+    margin-left: 20px;
+    margin-right: 40px;
+    border-bottom-left-radius: 4px;
+    border: 1px solid var(--border-color);
 }
 
 .typing-indicator {
@@ -348,12 +380,21 @@ body {
 
 #chat-input {
     flex: 1;
-    padding: 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
     resize: none;
     background-color: var(--background-color);
     color: var(--text-color);
+    font-size: 14px;
+    line-height: 1.5;
+    transition: all 0.2s ease;
+}
+
+#chat-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
 }
 
 #chat-drawing-container {
@@ -388,17 +429,23 @@ body {
     background-color: var(--primary-color);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
-    padding: 10px 15px;
-    font-size: 16px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-sm);
 }
 
 #send-chat-btn:hover {
-    opacity: 0.9;
+    background-color: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 /* Chat input controls */
@@ -627,32 +674,33 @@ body {
 /* Canvas actions toolbar */
 #canvas-actions {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  bottom: 24px;
+  right: 24px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   z-index: 90;
 }
 
 #stream-to-canvas-btn {
-  background-color: var(--primary-color);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
   color: white;
   border: none;
-  border-radius: 30px;
-  padding: 12px 18px;
+  border-radius: 50px;
+  padding: 14px 24px;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
-  gap: 8px;
-  transition: all 0.2s ease;
+  gap: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: 14px;
+  font-weight: 600;
 }
 
 #stream-to-canvas-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
 }
 
 #stream-to-canvas-btn i {
@@ -663,20 +711,23 @@ body {
   position: absolute;
   background-color: var(--modal-content-bg);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 10px 15px;
-  max-width: 300px;
+  border-radius: 12px;
+  padding: 12px 16px;
+  max-width: 320px;
   pointer-events: auto;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   transform-origin: top left;
-  opacity: 0.9;
+  opacity: 0.95;
   overflow: hidden;
+  backdrop-filter: blur(10px);
 }
 
 .text-bubble:hover {
   opacity: 1;
   z-index: 41;
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.02);
 }
 
 .text-bubble h4 {
@@ -890,13 +941,15 @@ body {
   display: none;
   position: absolute;
   right: 0;
-  top: 40px;
+  top: 46px;
   background-color: var(--modal-content-bg);
-  min-width: 160px;
-  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-  z-index: 1;
-  border-radius: 4px;
+  min-width: 200px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1001;
+  border-radius: 8px;
   overflow: hidden;
+  border: 1px solid var(--border-color);
+  animation: fadeIn 0.2s ease;
 }
 
 .dropdown:hover .dropdown-content {
@@ -909,11 +962,15 @@ body {
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .dropdown-content a:hover {
-  background-color: var(--surface-color);
+  background-color: var(--active-color);
+  color: var(--primary-color);
 }
 
 /* Hide elements when needed */
@@ -966,48 +1023,135 @@ body {
 }
 
 /* Responsive layout adjustments */
+@media (max-width: 1024px) {
+  #toolbar {
+    padding: 10px 15px;
+  }
+
+  #toolbar button {
+    padding: 6px 12px;
+    height: 36px;
+    font-size: 13px;
+  }
+
+  .toolbar-section {
+    gap: 2px;
+    margin-right: 8px;
+  }
+}
+
 @media (max-width: 768px) {
-  .toolbar-section.content-tools span {
+  #toolbar {
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .toolbar-section {
+    gap: 2px;
+    margin-right: 6px;
+    padding: 0;
+  }
+
+  .toolbar-section.content-tools button span,
+  .toolbar-section.app-tools button span {
     display: none;
   }
-  
+
   #toolbar button {
-    padding: 6px 8px;
+    padding: 6px 10px;
+    height: 34px;
+    margin: 0 2px;
+    font-size: 14px;
   }
-  
+
   .modal-content {
     width: 95%;
     margin: 2vh auto;
-    padding: 15px;
+    padding: 16px;
   }
-  
+
+  #response-modal .modal-content {
+    width: 100%;
+    max-width: 100vw;
+  }
+
   .text-bubble {
     max-width: 250px;
+    padding: 8px 12px;
   }
-  
+
   #write-prompt-panel {
     width: 95%;
     right: 10px;
   }
+
+  #canvas-actions {
+    bottom: 15px;
+    right: 15px;
+  }
+
+  #stream-to-canvas-btn {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
 }
 
 @media (max-width: 480px) {
-  .toolbar-section.content-tools,
-  .toolbar-section.app-tools {
-    flex-wrap: wrap;
-  }
-  
   #toolbar {
-    flex-wrap: wrap;
-    gap: 5px;
+    padding: 6px 8px;
   }
-  
+
+  .toolbar-section.drawing-tools,
+  .toolbar-section.history-tools {
+    border-right: none;
+    padding-right: 4px;
+  }
+
+  #toolbar button {
+    padding: 5px 8px;
+    height: 32px;
+    margin: 0 1px;
+    font-size: 13px;
+  }
+
+  #toolbar button i {
+    margin-right: 0;
+    font-size: 0.9rem;
+  }
+
   .toolbar-section {
-    margin-right: 5px;
+    margin-right: 4px;
   }
-  
+
   .text-bubble {
     max-width: 200px;
+    font-size: 13px;
+  }
+
+  .modal-content {
+    padding: 12px;
+  }
+
+  .primary-button {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  #canvas-actions {
+    bottom: 10px;
+    right: 10px;
+  }
+
+  #stream-to-canvas-btn span {
+    display: none;
+  }
+
+  #stream-to-canvas-btn {
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    padding: 0;
   }
 }
 
