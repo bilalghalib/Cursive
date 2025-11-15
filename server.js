@@ -6,13 +6,15 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PORT = 5022;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5022;
+const HOST = process.env.HOST || '0.0.0.0'; // bind to all interfaces for LAN access
 const BASE_DIR = __dirname;
 
 const MIME_TYPES = {
@@ -99,8 +101,21 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`✅ Cursive server running on http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  const localUrl = `http://localhost:${PORT}`;
+  const networkUrl = HOST === '0.0.0.0' ? `http://${getLocalIP()}:${PORT}` : `http://${HOST}:${PORT}`;
+  console.log(`✅ Cursive server running on ${localUrl}`);
+  if (HOST === '0.0.0.0') {
+    console.log(`🌐 Accessible on your network at ${networkUrl}`);
+  } else {
+    console.log(`🌐 Server bound to host ${HOST}`);
+  }
   console.log(`📁 Serving static files from ${BASE_DIR}`);
   console.log(`🔌 Connected to Supabase cloud database`);
 });
+
+function getLocalIP() {
+  const interfaces = Object.values(os.networkInterfaces()).flat();
+  const lan = interfaces.find(iface => iface && iface.family === 'IPv4' && !iface.internal);
+  return lan ? lan.address : 'your-local-ip';
+}
