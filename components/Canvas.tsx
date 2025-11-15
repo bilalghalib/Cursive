@@ -15,7 +15,12 @@ interface Stroke {
 
 type Tool = 'draw' | 'select' | 'pan' | 'zoom';
 
-export function Canvas() {
+interface CanvasProps {
+  notebookId?: string;
+  readOnly?: boolean;
+}
+
+export function Canvas({ notebookId, readOnly = false }: CanvasProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
 
