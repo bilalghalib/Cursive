@@ -36,6 +36,11 @@ flask_session/
 venv/
 env/
 ENV/
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
 
 # Database
 *.db

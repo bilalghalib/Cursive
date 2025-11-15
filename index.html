@@ -6,10 +6,10 @@
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta http-equiv="Pragma" content="no-cache">
         <meta http-equiv="Expires" content="0">
-        <title>AI Notebook - Infinite Canvas</title>
+        <title>Cursive - AI Notebook</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Caveat&family=Indie+Flower&family=Dancing+Script&display=swap">
-        <link rel="stylesheet" href="/static/css/styles.css">
+        <link rel="stylesheet" href="/css/styles.css">
     </head>
     <body>
         <div id="toolbar">
@@ -20,31 +20,25 @@
             <button id="pan-btn" title="Pan Canvas"><i class="fas fa-hand-paper"></i></button>
             <button id="zoom-btn" title="Zoom"><i class="fas fa-search"></i></button>
         </div>
-
+        
         <div class="toolbar-section history-tools">
             <!-- History controls -->
             <button id="undo-btn" title="Undo"><i class="fas fa-undo"></i></button>
             <button id="redo-btn" title="Redo"><i class="fas fa-redo"></i></button>
         </div>
-
+        
         <div class="toolbar-section content-tools">
             <!-- Content tools -->
             <button id="prompt-btn" title="Get a Writing Prompt"><i class="fas fa-lightbulb"></i> Prompt</button>
             <button id="new-session-btn" title="Clear Canvas and Start Fresh"><i class="fas fa-trash-alt"></i> Clear All</button>
         </div>
-
+        
         <div class="toolbar-section app-tools">
             <!-- App controls -->
             <button id="theme-toggle" title="Toggle Dark/Light Mode"><i class="fas fa-moon"></i></button>
             <button id="save-to-web-btn" title="Save to Web"><i class="fas fa-globe"></i></button>
             <button id="pdf-export-btn" title="Export to PDF"><i class="fas fa-file-pdf"></i></button>
             <button id="about-btn" title="About"><i class="fas fa-info-circle"></i></button>
-
-            <!-- Login/Logout button -->
-            <button id="auth-btn" title="Login/Signup">
-                <i class="fas fa-user"></i>
-                <span id="auth-btn-text">Login</span>
-            </button>
 
             <!-- More options dropdown -->
             <div class="dropdown">
@@ -65,9 +59,9 @@
     <div id="canvas-container">
         <canvas id="drawing-canvas"></canvas>
         <div id="text-overlays"></div>
-
-        <!-- Quick Actions Toolbar (hidden by default) -->
-        <div id="canvas-actions" style="display: none;">
+        
+        <!-- Quick Actions Toolbar -->
+        <div id="canvas-actions">
             <button id="stream-to-canvas-btn" title="Stream AI Response Directly to Canvas">
                 <i class="fas fa-magic"></i>
                 <span>Stream AI Text</span>
@@ -133,7 +127,7 @@
             <p id="prompt-content"></p>
         </div>
     </div>
-
+    
     <div id="stream-prompt-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -149,7 +143,7 @@
             </div>
         </div>
     </div>
-
+    
     <div id="save-to-web-modal" class="modal">
         <div class="modal-content">
             <h2>Your page has been saved</h2>
@@ -160,36 +154,32 @@
         </div>
     </div>
     <div id="debug-console"></div>
-
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-    <!-- Supabase Client Library (local copy to avoid third-party tracking blocks) -->
-    <script src="/static/vendor/supabase-js.min.js"></script>
-
     <!-- Import version first -->
     <script type="module">
         // Load version information first to set up dynamic imports
-        import { VERSION } from "/static/js/version.js";
+        import { VERSION } from "./static/js/version.js";
         window.CURSIVE_VERSION = VERSION;
         console.log(`Loading Cursive v${VERSION}`);
     </script>
 
-    <!-- Use direct script tags with version parameter -->
-    <script type="module" src="/static/js/config.js"></script>
-    <script type="module" src="/static/js/supabaseClient.js"></script>
-    <script type="module" src="/static/js/supabaseConfig.js"></script>
-    <script type="module" src="/static/js/authService.js"></script>
-    <script type="module" src="/static/js/sharingService.js"></script>
-    <script type="module" src="/static/js/collaborationService.js"></script>
-    <script type="module" src="/static/js/dataManager.js"></script>
-    <script type="module" src="/static/js/handwritingSimulation.js"></script>
-    <script type="module" src="/static/js/canvasManager.js"></script>
-    <script type="module" src="/static/js/promptManager.js"></script>
-    <script type="module" src="/static/js/aiService.js"></script>
-    <script type="module" src="/static/js/pluginManager.js"></script>
-    <script type="module" src="/static/js/app.js"></script>
+    <!-- Use direct script tags (Vite handles cache busting in production) -->
+    <script type="module" src="./static/js/config.js"></script>
+    <script type="module" src="./static/js/supabaseClient.js"></script>
+    <script type="module" src="./static/js/authService.js"></script>
+    <script type="module" src="./static/js/sharingService.js"></script>
+    <script type="module" src="./static/js/collaborationService.js"></script>
+    <script type="module" src="./static/js/dataManager.js"></script>
+    <script type="module" src="./static/js/handwritingSimulation.js"></script>
+    <script type="module" src="./static/js/canvasManager.js"></script>
+    <script type="module" src="./static/js/promptManager.js"></script>
+    <script type="module" src="./static/js/aiService.js"></script>
+    <script type="module" src="./static/js/pluginManager.js"></script>
+    <script type="module" src="./static/js/app.js"></script>
 
     <script>
         // Wait for a small delay to ensure all modules are loaded
@@ -218,7 +208,7 @@
                 "How can you create a light-hearted moment today that mirrors a cherished memory from the past, like a nostalgic dance party to your favorite 80s jam?",
                 "What's a new opportunity or silver lining you discovered in the past that you can apply to today's challenges, like a hidden superpower?"
             ];
-
+            
             if (aboutBtn) {
                 aboutBtn.addEventListener('click', () => {
                     console.log('About button clicked');
