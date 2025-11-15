@@ -1,13 +1,10 @@
 import { getConfig } from './config.js';
-
-// Get Supabase config from environment variables
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+import { ENV } from './env.js';
 
 // Edge Function endpoints
 const EDGE_FUNCTIONS = {
-  claudeProxy: `${SUPABASE_URL}/functions/v1/claude-proxy`,
-  stripeWebhook: `${SUPABASE_URL}/functions/v1/stripe-webhook`
+  claudeProxy: `${ENV.SUPABASE_URL}/functions/v1/claude-proxy`,
+  stripeWebhook: `${ENV.SUPABASE_URL}/functions/v1/stripe-webhook`
 };
 
 export async function sendImageToAI(imageData) {
@@ -17,7 +14,7 @@ export async function sendImageToAI(imageData) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        'Authorization': `Bearer ${ENV.SUPABASE_ANON_KEY}`
       },
       body: JSON.stringify({
         model: config.claude.model,
@@ -79,7 +76,7 @@ export async function sendChatToAI(chatHistory, onProgress = null) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          'Authorization': `Bearer ${ENV.SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           model: config.claude.model,
@@ -102,7 +99,7 @@ export async function sendChatToAI(chatHistory, onProgress = null) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          'Authorization': `Bearer ${ENV.SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           model: config.claude.model,
