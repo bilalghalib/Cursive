@@ -17,6 +17,9 @@ let isAppInitialized = false;
 
 let isZoomMode = false;
 
+// Expose redrawCanvas to window for plugins
+window.redrawCanvas = redrawCanvas;
+
 async function initApp() {
     if (isAppInitialized) return;
 
