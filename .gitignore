@@ -55,3 +55,4 @@ server.log
 # Auto-generated files
 static/js/version.js
 .DS_Store
+.vercel
