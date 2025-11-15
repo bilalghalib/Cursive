@@ -3,6 +3,7 @@ import { readFile } from 'fs/promises';
 import { extname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { networkInterfaces } from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,12 +26,29 @@ const mimeTypes = {
   '.yaml': 'text/yaml'
 };
 
+// Get local network IP address
+function getNetworkAddress() {
+  const nets = networkInterfaces();
+
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      // Skip internal (loopback) and non-IPv4 addresses
+      const familyV4Value = typeof net.family === 'string' ? 'IPv4' : 4;
+      if (net.family === familyV4Value && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+
+  return null;
+}
+
 const server = createServer(async (req, res) => {
   console.log(`${req.method} ${req.url}`);
 
   // Parse URL
   let filePath = req.url === '/' ? '/index.html' : req.url;
-  
+
   // Remove query string
   filePath = filePath.split('?')[0];
 
@@ -46,8 +64,8 @@ const server = createServer(async (req, res) => {
     const data = await readFile(fullPath);
     const ext = extname(fullPath);
     const contentType = mimeTypes[ext] || 'application/octet-stream';
-    
-    res.writeHead(200, { 
+
+    res.writeHead(200, {
       'Content-Type': contentType,
       'Access-Control-Allow-Origin': '*'
     });
@@ -64,10 +82,18 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`\n🚀 Cursive is running!`);
-  console.log(`\n📱 Local:     http://localhost:${PORT}`);
-  console.log(`📱 Network:   http://0.0.0.0:${PORT}`);
-  console.log(`\n💡 To access from iPad:`);
-  console.log(`   1. Find your computer's IP address (ifconfig or ipconfig)`);
-  console.log(`   2. Open http://YOUR_IP:${PORT} on your iPad\n`);
+  const networkAddress = getNetworkAddress();
+
+  console.log('');
+  console.log('  🎨 Cursive - AI-Powered Digital Notebook');
+  console.log('');
+  console.log(`  - Local:    http://localhost:${PORT}`);
+
+  if (networkAddress) {
+    console.log(`  - Network:  http://${networkAddress}:${PORT}`);
+  }
+
+  console.log('');
+  console.log('  💡 Open the Network URL on your iPad to test with Apple Pencil');
+  console.log('');
 });
