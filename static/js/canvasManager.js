@@ -1,6 +1,7 @@
 import { getConfig } from './config.js';
 import { handleImageSelection, displayFullResponse, isZoomMode } from './app.js';
 import { getAllNotebookItems, getDrawings, saveDrawings, getInitialDrawingData, updateNotebookItem } from './dataManager.js';
+import { pluginManager } from './pluginManager.js';
 
 let canvas, ctx;
 let isDrawing = false;
@@ -180,6 +181,13 @@ function handleTouchEnd(e) {
 
 function handlePointerDown(e) {
     const { x, y } = getCanvasCoordinates(e);
+
+    // Forward event to active plugin if exists
+    if (pluginManager && pluginManager.activePlugin) {
+        pluginManager.handleCanvasEvent('mousedown', e, x, y);
+        return; // Let the plugin handle it
+    }
+
     if (mode === 'pan') {
         isPanning = true;
         setPanningCursor();
@@ -225,7 +233,13 @@ function handlePointerDown(e) {
 function handlePointerMove(e) {
     // Get canvas coordinates accounting for current pan and zoom
     const { x, y } = getCanvasCoordinates(e);
-    
+
+    // Forward event to active plugin if exists
+    if (pluginManager && pluginManager.activePlugin) {
+        pluginManager.handleCanvasEvent('mousemove', e, x, y);
+        return;
+    }
+
     if (isPanning) {
         // Calculate more accurate delta movement with smoother panning
         const dx = e.clientX - lastX;
@@ -274,6 +288,14 @@ function handlePointerMove(e) {
 }
 
 function handlePointerUp(e) {
+    const { x, y } = getCanvasCoordinates(e);
+
+    // Forward event to active plugin if exists
+    if (pluginManager && pluginManager.activePlugin) {
+        pluginManager.handleCanvasEvent('mouseup', e, x, y);
+        return;
+    }
+
     if (isPanning) {
         isPanning = false;
         resetPanningCursor();
