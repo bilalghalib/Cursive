@@ -190,7 +190,7 @@ body {
 
 /* Response modal - positioned on the right side */
 #response-modal {
-    background-color: rgba(0, 0, 0, 0.05); /* Very light overlay - don't block the view */
+    background-color: transparent; /* No overlay - don't block the view */
     pointer-events: none; /* Don't block clicks on the canvas */
 }
 
@@ -310,6 +310,30 @@ body {
     padding: 10px;
     border-radius: 8px;
     background-color: var(--background-color);
+}
+
+.transcription-toggle {
+    background-color: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 8px 0;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.transcription-toggle:hover {
+    color: var(--primary-color);
+}
+
+.transcription-toggle i {
+    font-size: 12px;
+    transition: transform 0.2s ease;
 }
 
 .chat-message {

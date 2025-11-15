@@ -373,26 +373,45 @@ async function handleImageSelection(selectionData) {
 async function handleTranscriptionResponse(transcription) {
     try {
         showLoading();
-        
+
         // Get response modal elements
         const modal = document.getElementById('response-modal');
         const content = document.getElementById('response-content');
-        
-        // Clear previous content and add heading
+
+        // Clear previous content
         content.innerHTML = '';
-        
-        // Add user message to display
+
+        // Add collapsible transcription (hidden by default)
+        const transcriptionToggle = document.createElement('button');
+        transcriptionToggle.classList.add('transcription-toggle');
+        transcriptionToggle.innerHTML = '<i class="fas fa-chevron-down"></i> Show what I wrote';
+
         const userMessageElement = document.createElement('div');
-        userMessageElement.classList.add('chat-message', 'user-message');
-        userMessageElement.innerHTML = `<strong>You wrote:</strong> ${transcription}`;
+        userMessageElement.classList.add('chat-message', 'user-message', 'hidden');
+        userMessageElement.setAttribute('data-transcription', 'true');
+        userMessageElement.textContent = transcription;
+
+        transcriptionToggle.addEventListener('click', () => {
+            userMessageElement.classList.toggle('hidden');
+            const icon = transcriptionToggle.querySelector('i');
+            if (userMessageElement.classList.contains('hidden')) {
+                icon.className = 'fas fa-chevron-down';
+                transcriptionToggle.innerHTML = '<i class="fas fa-chevron-down"></i> Show what I wrote';
+            } else {
+                icon.className = 'fas fa-chevron-up';
+                transcriptionToggle.innerHTML = '<i class="fas fa-chevron-up"></i> Hide what I wrote';
+            }
+        });
+
+        content.appendChild(transcriptionToggle);
         content.appendChild(userMessageElement);
-        
-        // Add typing indicator
+
+        // Add typing indicator for AI response
         const typingElement = document.createElement('div');
         typingElement.classList.add('chat-message', 'ai-message', 'typing');
-        typingElement.innerHTML = `<strong>Claude:</strong> <span class="typing-indicator">...</span>`;
+        typingElement.innerHTML = `<span class="typing-indicator">...</span>`;
         content.appendChild(typingElement);
-        
+
         // Show the modal
         modal.style.display = 'block';
         
