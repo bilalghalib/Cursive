@@ -52,6 +52,9 @@ const server = http.createServer((req, res) => {
   } else if (filePath.startsWith('/pages/')) {
     // Serve shared pages
     filePath = filePath;
+  } else if (filePath.endsWith('.html')) {
+    // HTML files in root directory (handwriting-trainer.html, handwriting-test.html, etc.)
+    filePath = filePath;  // Keep as-is
   } else {
     // Try as static file
     filePath = '/static' + filePath;
