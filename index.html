@@ -159,6 +159,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+    <!-- Supabase Client Library from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <!-- Import version first -->
     <script type="module">
         // Load version information first to set up dynamic imports
@@ -167,7 +170,7 @@
         console.log(`Loading Cursive v${VERSION}`);
     </script>
 
-    <!-- Use direct script tags (Vite handles cache busting in production) -->
+    <!-- Load all modules -->
     <script type="module" src="./static/js/config.js"></script>
     <script type="module" src="./static/js/supabaseClient.js"></script>
     <script type="module" src="./static/js/authService.js"></script>
