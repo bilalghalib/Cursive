@@ -503,6 +503,30 @@ def serve_page(page_id=None):
         return f"Error loading page: {str(e)}", 500
 
 
+@app.route('/handwriting-trainer')
+def handwriting_trainer():
+    """Serve the handwriting training page."""
+    try:
+        response = make_response(render_template('handwriting_trainer.html'))
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response
+    except Exception as e:
+        logger.error(f"Error serving handwriting trainer: {str(e)}")
+        return f"Error loading trainer: {str(e)}", 500
+
+
+@app.route('/handwriting-test')
+def handwriting_test():
+    """Serve the handwriting test page."""
+    try:
+        response = make_response(render_template('handwriting_test.html'))
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response
+    except Exception as e:
+        logger.error(f"Error serving handwriting test: {str(e)}")
+        return f"Error loading test page: {str(e)}", 500
+
+
 @app.route('/share/<share_id>')
 def serve_shared_page(share_id):
     """
