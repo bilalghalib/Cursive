@@ -116,7 +116,10 @@ export async function getDrawings() {
 
             return drawings;
         } catch (error) {
-            console.error('Error loading from Supabase, falling back to localStorage:', error);
+            // Only log non-auth errors (auth errors are expected in guest mode)
+            if (!error.message?.includes('User must be authenticated')) {
+                console.error('Error loading from Supabase, falling back to localStorage:', error);
+            }
             return JSON.parse(localStorage.getItem('drawings') || '[]');
         }
     }
@@ -136,7 +139,10 @@ export async function saveDrawings(drawings) {
             await saveDrawingsToSupabase(notebookId, drawings);
             console.log('✅ Drawings saved to Supabase and localStorage');
         } catch (error) {
-            console.error('Error saving to Supabase (saved to localStorage):', error);
+            // Only log non-auth errors (auth errors are expected in guest mode)
+            if (!error.message?.includes('User must be authenticated')) {
+                console.error('Error saving to Supabase (saved to localStorage):', error);
+            }
         }
     }
 }

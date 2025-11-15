@@ -8,11 +8,8 @@
 // Get Supabase from the CDN (loaded in index.html)
 const { createClient } = supabase;
 
-// Supabase configuration
-// IMPORTANT: These values need to be set from your Supabase project
-// Get them from: https://supabase.com/dashboard > Your Project > Settings > API
-const SUPABASE_URL = 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-key-here';
+// Import Supabase config
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './supabaseConfig.js';
 
 // Create and export Supabase client
 export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

@@ -20,13 +20,6 @@ let isZoomMode = false;
 async function initApp() {
     if (isAppInitialized) return;
 
-    // Check authentication first
-    if (!isAuthenticated()) {
-        console.log('User not authenticated, showing auth modal');
-        showAuthModal();
-        return; // Don't initialize app until user logs in
-    }
-
     showLoading();
 
     try {
@@ -35,7 +28,7 @@ async function initApp() {
             throw new Error('Configuration not loaded. Cannot initialize app.');
         }
 
-        // Initialize auth UI
+        // Initialize auth UI (works for both logged in and logged out states)
         setupAuthUI();
 
         await initCanvas();
@@ -1876,12 +1869,38 @@ function hideAuthModal() {
 }
 
 async function setupAuthUI() {
-    // Update user email in settings
+    // Check if user is authenticated
     const user = await getCurrentUser();
+
+    // Update auth button based on login state
+    const authBtn = document.getElementById('auth-btn');
+    const authBtnText = document.getElementById('auth-btn-text');
+
     if (user) {
+        // User is logged in
+        if (authBtnText) authBtnText.textContent = user.email.split('@')[0]; // Show username
+        if (authBtn) {
+            authBtn.title = 'Settings & Logout';
+            authBtn.onclick = () => showSettingsModal();
+        }
+
         const userEmailElement = document.getElementById('user-email');
         if (userEmailElement) {
             userEmailElement.textContent = user.email;
+        }
+        console.log('✅ User authenticated:', user.email);
+    } else {
+        // User is NOT logged in
+        if (authBtnText) authBtnText.textContent = 'Login';
+        if (authBtn) {
+            authBtn.title = 'Login/Signup';
+            authBtn.onclick = () => showAuthModal();
+        }
+
+        console.log('ℹ️ User not authenticated - app running in guest mode');
+        const userEmailElement = document.getElementById('user-email');
+        if (userEmailElement) {
+            userEmailElement.textContent = 'Not logged in';
         }
     }
 
@@ -1890,7 +1909,19 @@ async function setupAuthUI() {
     if (settingsBtn) {
         settingsBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            showSettingsModal();
+            if (!user) {
+                showAuthModal();
+            } else {
+                showSettingsModal();
+            }
+        });
+    }
+
+    // Setup logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            await logout();
         });
     }
 }
@@ -1943,10 +1974,10 @@ function setupAuthModalHandlers() {
             loginSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
 
             try {
-                const { data, error } = await login(email, password);
+                const result = await login(email, password);
 
-                if (error) {
-                    showError(loginError, error.message || 'Login failed');
+                if (!result.success) {
+                    showError(loginError, result.error || 'Login failed');
                     loginSubmitBtn.disabled = false;
                     loginSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
                 } else {
@@ -2022,10 +2053,10 @@ function setupAuthModalHandlers() {
             signupSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
 
             try {
-                const { data, error } = await signUp(email, password);
+                const result = await signUp(email, password);
 
-                if (error) {
-                    showError(signupError, error.message || 'Registration failed');
+                if (!result.success) {
+                    showError(signupError, result.error || 'Registration failed');
                     signupSubmitBtn.disabled = false;
                     signupSubmitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
                 } else {

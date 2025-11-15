@@ -1,12 +1,14 @@
 import { getConfig } from './config.js';
+import { EDGE_FUNCTIONS, SUPABASE_ANON_KEY } from './supabaseConfig.js';
 
 export async function sendImageToAI(imageData) {
   try {
     const config = await getConfig();
-    const response = await fetch('/api/claude', {
+    const response = await fetch(EDGE_FUNCTIONS.claudeProxy, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
       },
       body: JSON.stringify({
         model: config.claude.model,
@@ -57,10 +59,11 @@ export async function sendChatToAI(chatHistory, onProgress = null) {
     
     // If no progress callback is provided, use the standard non-streaming approach
     if (!onProgress) {
-      const response = await fetch('/api/claude', {
+      const response = await fetch(EDGE_FUNCTIONS.claudeProxy, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           model: config.claude.model,
@@ -79,10 +82,11 @@ export async function sendChatToAI(chatHistory, onProgress = null) {
     } 
     // If progress callback provided, use streaming approach
     else {
-      const response = await fetch('/api/claude/stream', {
+      const response = await fetch(EDGE_FUNCTIONS.claudeProxy, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           model: config.claude.model,

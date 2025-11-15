@@ -52,13 +52,19 @@ export async function getCurrentUser() {
     const { data: { user }, error } = await supabaseClient.auth.getUser();
 
     if (error) {
-      console.error('Error getting user:', error);
+      // Don't log "session missing" errors - they're expected in guest mode
+      if (error.name !== 'AuthSessionMissingError') {
+        console.error('Error getting user:', error);
+      }
       return null;
     }
 
     return user;
   } catch (error) {
-    console.error('Error in getCurrentUser:', error);
+    // Don't log session missing errors
+    if (error.name !== 'AuthSessionMissingError') {
+      console.error('Error in getCurrentUser:', error);
+    }
     return null;
   }
 }

@@ -2,32 +2,23 @@ import { defineConfig } from 'vite';
 import path from 'path';
 
 export default defineConfig({
-  root: 'static',
-  publicDir: '../static',
+  // Serve from project root
+  root: '.',
 
   build: {
-    outDir: '../dist',
+    outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, 'templates/index.html')
+        main: path.resolve(__dirname, 'index.html')
       }
     }
   },
 
   server: {
     port: 3000,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5022',
-        changeOrigin: true
-      },
-      '/pages': {
-        target: 'http://localhost:5022',
-        changeOrigin: true
-      }
-    }
+    // No proxy needed - we're calling Supabase Edge Functions directly
   },
 
   resolve: {

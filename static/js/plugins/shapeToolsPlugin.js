@@ -19,7 +19,7 @@ class ShapeToolsPlugin extends BasePlugin {
             author: 'Cursive Team',
             settings: {
                 currentShape: 'rectangle',
-                fillColor: 'transparent',
+                fillColor: '#ffffff',
                 strokeColor: '#000000',
                 strokeWidth: 2,
                 fillEnabled: false,
