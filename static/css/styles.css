@@ -170,7 +170,12 @@ body {
 
 /* Response modal - positioned on the right side */
 #response-modal {
-    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent background */
+    background-color: rgba(0, 0, 0, 0.05); /* Very light overlay - don't block the view */
+    pointer-events: none; /* Don't block clicks on the canvas */
+}
+
+#response-modal .modal-content {
+    pointer-events: auto; /* But allow clicks on the modal itself */
 }
 
 #response-modal .modal-content {
