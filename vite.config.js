@@ -3,7 +3,7 @@ import { resolve } from 'path';
 
 export default defineConfig({
   root: '.',
-  publicDir: 'public',
+  publicDir: 'static',
 
   build: {
     outDir: 'dist',
@@ -18,9 +18,10 @@ export default defineConfig({
   },
   
   server: {
+    host: '0.0.0.0', // Expose to local network for iPad testing
     port: 5173,
     open: true,
-    // Serve templates directory
+    // Serve static directory
     fs: {
       allow: ['..']
     }

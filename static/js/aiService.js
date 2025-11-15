@@ -1,5 +1,14 @@
 import { getConfig } from './config.js';
-import { EDGE_FUNCTIONS, SUPABASE_ANON_KEY } from './supabaseConfig.js';
+
+// Get Supabase config from environment variables
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Edge Function endpoints
+const EDGE_FUNCTIONS = {
+  claudeProxy: `${SUPABASE_URL}/functions/v1/claude-proxy`,
+  stripeWebhook: `${SUPABASE_URL}/functions/v1/stripe-webhook`
+};
 
 export async function sendImageToAI(imageData) {
   try {

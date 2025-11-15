@@ -8,13 +8,13 @@
 // Import Supabase from npm package
 import { createClient } from '@supabase/supabase-js';
 
-// Get config from environment variables (Vite injects these at build time)
+// Get config from environment variables (Vite injects these at build/dev time)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Check your .env file.');
+  throw new Error('Missing Supabase environment variables. Make sure you have a .env file with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
 }
 
 // Create and export Supabase client
