@@ -1,5 +1,5 @@
--- Fix Supabase Schema Issues
--- Run this to add missing columns and fix RLS policies
+-- Fix Supabase Schema Issues (Updated for non-UUID user_id)
+-- This version handles the case where user_id is TEXT or INTEGER, not UUID
 
 -- ============================================================================
 -- STEP 1: Add missing columns to notebooks table (if they don't exist)
@@ -69,61 +69,7 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- STEP 3: Fix type mismatch between notebooks.id and drawings.notebook_id
--- ============================================================================
-
-DO $$
-DECLARE
-    notebooks_id_type TEXT;
-    drawings_notebook_id_type TEXT;
-    has_fkey BOOLEAN;
-BEGIN
-    -- Get column types
-    SELECT data_type INTO notebooks_id_type
-    FROM information_schema.columns
-    WHERE table_name = 'notebooks' AND column_name = 'id';
-
-    SELECT data_type INTO drawings_notebook_id_type
-    FROM information_schema.columns
-    WHERE table_name = 'drawings' AND column_name = 'notebook_id';
-
-    RAISE NOTICE 'notebooks.id type: %, drawings.notebook_id type: %',
-        notebooks_id_type, drawings_notebook_id_type;
-
-    -- If notebooks.id is UUID but notebook_id is not, convert it
-    IF notebooks_id_type = 'uuid' AND drawings_notebook_id_type != 'uuid' THEN
-        RAISE NOTICE 'Converting drawings.notebook_id from % to uuid...', drawings_notebook_id_type;
-
-        -- Check if foreign key exists
-        SELECT EXISTS (
-            SELECT 1 FROM information_schema.table_constraints
-            WHERE constraint_name = 'drawings_notebook_id_fkey'
-            AND table_name = 'drawings'
-        ) INTO has_fkey;
-
-        -- Drop foreign key if exists
-        IF has_fkey THEN
-            ALTER TABLE drawings DROP CONSTRAINT drawings_notebook_id_fkey;
-            RAISE NOTICE 'Dropped existing foreign key constraint';
-        END IF;
-
-        -- Convert to UUID (will fail if there's incompatible data)
-        ALTER TABLE drawings
-        ALTER COLUMN notebook_id TYPE UUID USING notebook_id::TEXT::UUID;
-
-        -- Recreate foreign key
-        ALTER TABLE drawings
-        ADD CONSTRAINT drawings_notebook_id_fkey
-        FOREIGN KEY (notebook_id) REFERENCES notebooks(id) ON DELETE CASCADE;
-
-        RAISE NOTICE 'Successfully converted notebook_id to UUID and recreated foreign key';
-    ELSE
-        RAISE NOTICE 'Type conversion not needed';
-    END IF;
-END $$;
-
--- ============================================================================
--- STEP 4: Enable RLS on tables (if not already enabled)
+-- STEP 3: Enable RLS on tables (if not already enabled)
 -- ============================================================================
 
 DO $$
@@ -134,7 +80,7 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- STEP 5: Drop existing policies (if any) and recreate them
+-- STEP 4: Drop existing policies (if any) and recreate them
 -- ============================================================================
 
 -- Drop existing policies for notebooks
@@ -150,31 +96,32 @@ DROP POLICY IF EXISTS "Users can update drawings in own notebooks" ON drawings;
 DROP POLICY IF EXISTS "Users can delete drawings from own notebooks" ON drawings;
 
 -- ============================================================================
--- STEP 6: Create RLS policies for notebooks
+-- STEP 5: Create RLS policies for notebooks (TEXT user_id version)
 -- ============================================================================
 
 -- Users can view their own notebooks OR shared notebooks
+-- Note: Convert auth.uid() to TEXT to match user_id column type
 CREATE POLICY "Users can view own notebooks"
   ON notebooks FOR SELECT
-  USING (auth.uid() = user_id OR is_shared = true);
+  USING (auth.uid()::TEXT = user_id::TEXT OR is_shared = true);
 
 -- Users can insert their own notebooks
 CREATE POLICY "Users can insert own notebooks"
   ON notebooks FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (auth.uid()::TEXT = user_id::TEXT);
 
 -- Users can update their own notebooks
 CREATE POLICY "Users can update own notebooks"
   ON notebooks FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::TEXT = user_id::TEXT);
 
 -- Users can delete their own notebooks
 CREATE POLICY "Users can delete own notebooks"
   ON notebooks FOR DELETE
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::TEXT = user_id::TEXT);
 
 -- ============================================================================
--- STEP 7: Create RLS policies for drawings
+-- STEP 6: Create RLS policies for drawings
 -- ============================================================================
 
 -- Users can view drawings from notebooks they own or that are shared
@@ -184,7 +131,7 @@ CREATE POLICY "Users can view drawings from accessible notebooks"
     EXISTS (
       SELECT 1 FROM notebooks
       WHERE notebooks.id = drawings.notebook_id
-      AND (notebooks.user_id = auth.uid() OR notebooks.is_shared = true)
+      AND (notebooks.user_id::TEXT = auth.uid()::TEXT OR notebooks.is_shared = true)
     )
   );
 
@@ -195,7 +142,7 @@ CREATE POLICY "Users can insert drawings to own notebooks"
     EXISTS (
       SELECT 1 FROM notebooks
       WHERE notebooks.id = drawings.notebook_id
-      AND notebooks.user_id = auth.uid()
+      AND notebooks.user_id::TEXT = auth.uid()::TEXT
     )
   );
 
@@ -206,7 +153,7 @@ CREATE POLICY "Users can update drawings in own notebooks"
     EXISTS (
       SELECT 1 FROM notebooks
       WHERE notebooks.id = drawings.notebook_id
-      AND notebooks.user_id = auth.uid()
+      AND notebooks.user_id::TEXT = auth.uid()::TEXT
     )
   );
 
@@ -217,12 +164,12 @@ CREATE POLICY "Users can delete drawings from own notebooks"
     EXISTS (
       SELECT 1 FROM notebooks
       WHERE notebooks.id = drawings.notebook_id
-      AND notebooks.user_id = auth.uid()
+      AND notebooks.user_id::TEXT = auth.uid()::TEXT
     )
   );
 
 -- ============================================================================
--- STEP 8: Create updated_at trigger function (if it doesn't exist)
+-- STEP 7: Create updated_at trigger function (if it doesn't exist)
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -244,15 +191,4 @@ CREATE TRIGGER update_notebooks_updated_at
 -- DONE!
 -- ============================================================================
 
--- Verify the fix
 SELECT 'Schema fixes applied successfully!' as status;
-
--- Show current notebooks table structure
-SELECT
-    column_name,
-    data_type,
-    is_nullable
-FROM information_schema.columns
-WHERE table_name = 'notebooks'
-AND table_schema = 'public'
-ORDER BY ordinal_position;
