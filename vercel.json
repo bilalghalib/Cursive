@@ -17,5 +17,19 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/css/:path*",
+      "destination": "/static/css/:path*"
+    },
+    {
+      "source": "/js/:path*",
+      "destination": "/static/js/:path*"
+    },
+    {
+      "source": "/config/:path*",
+      "destination": "/static/config/:path*"
+    }
   ]
 }
