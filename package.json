@@ -4,9 +4,8 @@
   "description": "AI-powered digital notebook with handwriting input",
   "type": "module",
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js",
-    "build": "tsc && vite build",
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit"
   },
@@ -16,6 +15,7 @@
     "vite": "^7.2.2"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.81.1",
     "file-saver": "^2.0.5",
     "jspdf": "^3.0.3"
   }

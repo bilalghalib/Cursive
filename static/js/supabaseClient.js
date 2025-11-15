@@ -5,14 +5,20 @@
  * It should be imported before any other modules that need Supabase access.
  */
 
-// Get Supabase from the CDN (loaded in index.html)
-const { createClient } = supabase;
+// Import Supabase from npm package
+import { createClient } from '@supabase/supabase-js';
 
-// Import Supabase config
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './supabaseConfig.js';
+// Get config from environment variables (Vite injects these at build/dev time)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables. Make sure you have a .env file with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+}
 
 // Create and export Supabase client
-export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
 // Helper to get current session
 export async function getSupabaseSession() {
