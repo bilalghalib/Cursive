@@ -14,13 +14,13 @@ let lastSelectionEnd = null;
  * Initialize writeback system
  * Check if user has trained their handwriting
  */
-export function initWriteback() {
-    isWritebackEnabled = hasHandwritingSamples();
+export async function initWriteback() {
+    isWritebackEnabled = await hasHandwritingSamples();
 
     if (isWritebackEnabled) {
         console.log('✓ Handwriting writeback enabled');
     } else {
-        console.log('ℹ Handwriting writeback disabled (no samples). Visit /handwriting-trainer to enable.');
+        console.log('ℹ Handwriting writeback disabled (no samples). Visit /handwriting-trainer.html to enable.');
     }
 
     return isWritebackEnabled;
@@ -345,5 +345,7 @@ export function addTrainingLink() {
     return link;
 }
 
-// Auto-init on module load
-initWriteback();
+// Auto-init on module load (async)
+(async () => {
+    await initWriteback();
+})();

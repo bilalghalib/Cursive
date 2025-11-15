@@ -284,7 +284,7 @@ function skipPrompt() {
     document.getElementById('next-btn').disabled = true;
 }
 
-function saveSample() {
+async function saveSample() {
     if (allStrokes.length === 0) return;
 
     const currentPrompt = trainingPrompts[currentPromptIndex];
@@ -301,22 +301,24 @@ function saveSample() {
         timestamp: Date.now()
     });
 
-    // Save to localStorage
-    localStorage.setItem('handwritingSamples', JSON.stringify(collectedSamples));
+    // Save to Supabase (with localStorage fallback)
+    const { saveHandwritingSamples } = await import('./handwritingStorage.js');
+    await saveHandwritingSamples(collectedSamples);
 
     console.log(`Saved sample for "${key}":`, allStrokes.length, 'strokes');
 }
 
-function loadSavedSamples() {
-    const saved = localStorage.getItem('handwritingSamples');
-    if (saved) {
-        try {
-            collectedSamples = JSON.parse(saved);
+async function loadSavedSamples() {
+    try {
+        const { loadHandwritingSamples } = await import('./handwritingStorage.js');
+        const saved = await loadHandwritingSamples();
+        if (saved) {
+            collectedSamples = saved;
             console.log('Loaded saved samples:', Object.keys(collectedSamples).length, 'characters');
-        } catch (e) {
-            console.error('Error loading saved samples:', e);
-            collectedSamples = {};
         }
+    } catch (e) {
+        console.error('Error loading saved samples:', e);
+        collectedSamples = {};
     }
 }
 
@@ -367,8 +369,9 @@ async function completeTraining() {
     // Analyze the collected samples to extract style parameters
     const styleProfile = analyzeHandwritingStyle();
 
-    // Save style profile
-    localStorage.setItem('handwritingStyleProfile', JSON.stringify(styleProfile));
+    // Save style profile to Supabase (with localStorage fallback)
+    const { saveHandwritingProfile } = await import('./handwritingStorage.js');
+    await saveHandwritingProfile(styleProfile);
 
     console.log('Training complete! Style profile:', styleProfile);
 

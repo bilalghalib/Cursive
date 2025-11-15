@@ -6,19 +6,18 @@
 /**
  * Load user's handwriting samples and style profile
  */
-export function loadUserHandwriting() {
-    const samplesJson = localStorage.getItem('handwritingSamples');
-    const profileJson = localStorage.getItem('handwritingStyleProfile');
-
-    if (!samplesJson || !profileJson) {
-        return null;
-    }
-
+export async function loadUserHandwriting() {
     try {
-        return {
-            samples: JSON.parse(samplesJson),
-            profile: JSON.parse(profileJson)
-        };
+        const { loadHandwritingSamples, loadHandwritingProfile } = await import('./handwritingStorage.js');
+
+        const samples = await loadHandwritingSamples();
+        const profile = await loadHandwritingProfile();
+
+        if (!samples || !profile) {
+            return null;
+        }
+
+        return { samples, profile };
     } catch (e) {
         console.error('Error loading handwriting data:', e);
         return null;
@@ -28,8 +27,9 @@ export function loadUserHandwriting() {
 /**
  * Check if user has trained their handwriting
  */
-export function hasHandwritingSamples() {
-    return loadUserHandwriting() !== null;
+export async function hasHandwritingSamples() {
+    const { hasHandwritingSamples } = await import('./handwritingStorage.js');
+    return await hasHandwritingSamples();
 }
 
 /**
@@ -40,8 +40,8 @@ export function hasHandwritingSamples() {
  * @param {Object} options - Synthesis options
  * @returns {Array} Array of stroke objects compatible with canvasManager
  */
-export function textToStrokes(text, startX, startY, options = {}) {
-    const handwriting = loadUserHandwriting();
+export async function textToStrokes(text, startX, startY, options = {}) {
+    const handwriting = await loadUserHandwriting();
 
     if (!handwriting) {
         console.warn('No handwriting samples found. User needs to train first.');
@@ -377,8 +377,8 @@ export function parseLLMResponse(response) {
 /**
  * Get a user-friendly description of their handwriting style
  */
-export function getStyleDescription() {
-    const handwriting = loadUserHandwriting();
+export async function getStyleDescription() {
+    const handwriting = await loadUserHandwriting();
     if (!handwriting) return 'No handwriting profile';
 
     const { profile } = handwriting;
