@@ -99,7 +99,7 @@ export async function loadHandwritingSamples() {
         .from('user_handwriting')
         .select('samples')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.warn('No handwriting in Supabase, checking localStorage:', error.message);
@@ -135,7 +135,7 @@ export async function loadHandwritingProfile() {
         .from('user_handwriting')
         .select('style_profile')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.warn('No profile in Supabase, checking localStorage:', error.message);
