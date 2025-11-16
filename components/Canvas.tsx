@@ -1,39 +1,16 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import type { CanvasState, CanvasActions, Stroke, ChatMessage, TextOverlay } from '@/lib/types';
+import { sendImageToAI, imageDataToBase64, sendChatToAI } from '@/lib/ai';
 
-interface Point {
-  x: number;
-  y: number;
+interface CanvasProps {
+  state: CanvasState;
+  actions: CanvasActions;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
 }
 
-interface Stroke {
-  points: Point[];
-  color: string;
-  width: number;
-}
-
-type Tool = 'draw' | 'select' | 'pan' | 'zoom';
-
-export function Canvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-
-  // Drawing state
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentTool, setCurrentTool] = useState<Tool>('draw');
-  const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
-  const [drawings, setDrawings] = useState<Stroke[]>([]);
-  
-  // Transform state
-  const [scale, setScale] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
-  
-  // Undo/redo
-  const [undoStack, setUndoStack] = useState<Stroke[][]>([[]]);
-  const [redoStack, setRedoStack] = useState<Stroke[][]>([]);
-
+export function Canvas({ state, actions, canvasRef }: CanvasProps) {
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -41,8 +18,6 @@ export function Canvas() {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    ctxRef.current = ctx;
 
     // Set canvas size
     const resizeCanvas = () => {
@@ -65,20 +40,22 @@ export function Canvas() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Fill background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     return () => {
       window.removeEventListener('resize', resizeCanvas);
     };
   }, []);
 
-  // Redraw canvas
+  // Redraw canvas whenever state changes
+  useEffect(() => {
+    redrawCanvas();
+  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect, state.textOverlays]);
+
   const redrawCanvas = () => {
     const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
-    if (!canvas || !ctx) return;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     // Clear canvas
     ctx.save();
@@ -89,30 +66,38 @@ export function Canvas() {
 
     // Apply transformations
     ctx.save();
-    ctx.translate(panX, panY);
-    ctx.scale(scale, scale);
+    ctx.translate(state.panX, state.panY);
+    ctx.scale(state.scale, state.scale);
 
     // Draw all strokes
-    drawings.forEach(stroke => {
-      drawStroke(stroke);
+    state.drawings.forEach(stroke => {
+      drawStroke(ctx, stroke);
     });
 
     // Draw current stroke
-    if (currentStroke.length > 0) {
-      drawStroke({
-        points: currentStroke,
+    if (state.currentStroke.length > 0) {
+      drawStroke(ctx, {
+        points: state.currentStroke,
         color: '#000000',
         width: 2
       });
     }
 
+    // Draw text overlays
+    state.textOverlays.forEach(overlay => {
+      drawTextOverlay(ctx, overlay);
+    });
+
     ctx.restore();
+
+    // Draw selection rectangle (after restoring transform, so it's not affected by pan/zoom)
+    if (state.selectionRect) {
+      drawSelectionRect(ctx, state.selectionRect);
+    }
   };
 
-  // Draw a stroke
-  const drawStroke = (stroke: Stroke) => {
-    const ctx = ctxRef.current;
-    if (!ctx || stroke.points.length === 0) return;
+  const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
+    if (stroke.points.length === 0) return;
 
     ctx.beginPath();
     ctx.strokeStyle = stroke.color;
@@ -129,61 +114,279 @@ export function Canvas() {
     ctx.stroke();
   };
 
-  // Redraw when drawings change
-  useEffect(() => {
-    redrawCanvas();
-  }, [drawings, currentStroke, scale, panX, panY]);
+  const drawTextOverlay = (ctx: CanvasRenderingContext2D, overlay: TextOverlay) => {
+    ctx.save();
+
+    // Set font and text properties
+    ctx.font = `${overlay.fontSize}px 'Caveat', cursive`;
+    ctx.fillStyle = overlay.color;
+    ctx.textBaseline = 'top';
+
+    // Word wrap the text
+    const words = overlay.text.split(' ');
+    const lineHeight = overlay.fontSize * 1.4;
+    let currentLine = '';
+    let y = overlay.y;
+
+    for (let i = 0; i < words.length; i++) {
+      const testLine = currentLine + words[i] + ' ';
+      const metrics = ctx.measureText(testLine);
+
+      if (metrics.width > overlay.width && i > 0) {
+        ctx.fillText(currentLine, overlay.x, y);
+        currentLine = words[i] + ' ';
+        y += lineHeight;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    ctx.fillText(currentLine, overlay.x, y);
+
+    ctx.restore();
+  };
+
+  const drawSelectionRect = (ctx: CanvasRenderingContext2D, rect: { startX: number; startY: number; endX: number; endY: number }) => {
+    const minX = Math.min(rect.startX, rect.endX);
+    const minY = Math.min(rect.startY, rect.endY);
+    const width = Math.abs(rect.endX - rect.startX);
+    const height = Math.abs(rect.endY - rect.startY);
+
+    // Draw dashed rectangle
+    ctx.save();
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = '#2563eb'; // blue-600
+    ctx.lineWidth = 2;
+    ctx.strokeRect(minX, minY, width, height);
+
+    // Draw semi-transparent fill
+    ctx.fillStyle = 'rgba(37, 99, 235, 0.1)';
+    ctx.fillRect(minX, minY, width, height);
+    ctx.restore();
+  };
+
+  // Get canvas coordinates from event
+  const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left - state.panX) / state.scale;
+    const y = (e.clientY - rect.top - state.panY) / state.scale;
+
+    return { x, y };
+  };
+
+  const getScreenCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  };
 
   // Pointer event handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - panX) / scale;
-    const y = (e.clientY - rect.top - panY) / scale;
+    // Capture pointer for smooth tracking
+    canvas.setPointerCapture(e.pointerId);
 
-    if (currentTool === 'draw') {
-      setIsDrawing(true);
-      setCurrentStroke([{ x, y }]);
+    switch (state.currentTool) {
+      case 'draw': {
+        const { x, y } = getCanvasCoords(e);
+        actions.startDrawing({ x, y });
+        break;
+      }
+      case 'select': {
+        const { x, y } = getScreenCoords(e);
+        actions.startSelection(x, y);
+        break;
+      }
+      case 'pan': {
+        const { x, y } = getScreenCoords(e);
+        actions.startPan(x, y);
+        // Change cursor
+        canvas.style.cursor = 'grabbing';
+        break;
+      }
+      // Zoom mode doesn't use pointer down
     }
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || currentTool !== 'draw') return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - panX) / scale;
-    const y = (e.clientY - rect.top - panY) / scale;
-
-    setCurrentStroke(prev => [...prev, { x, y }]);
-  };
-
-  const handlePointerUp = () => {
-    if (isDrawing && currentStroke.length > 0) {
-      // Save stroke to drawings
-      const newStroke: Stroke = {
-        points: currentStroke,
-        color: '#000000',
-        width: 2
-      };
-
-      setDrawings(prev => {
-        const newDrawings = [...prev, newStroke];
-        // Update undo stack
-        setUndoStack(stack => [...stack, newDrawings]);
-        setRedoStack([]);
-        return newDrawings;
-      });
-
-      setCurrentStroke([]);
+    switch (state.currentTool) {
+      case 'draw': {
+        if (state.currentStroke.length > 0) {
+          const { x, y } = getCanvasCoords(e);
+          actions.continueDrawing({ x, y });
+        }
+        break;
+      }
+      case 'select': {
+        if (state.selectionRect) {
+          const { x, y } = getScreenCoords(e);
+          actions.updateSelection(x, y);
+        }
+        break;
+      }
+      case 'pan': {
+        const { x, y } = getScreenCoords(e);
+        actions.updatePan(x, y);
+        break;
+      }
     }
-
-    setIsDrawing(false);
   };
+
+  const handlePointerUp = async (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Release pointer capture
+    canvas.releasePointerCapture(e.pointerId);
+
+    switch (state.currentTool) {
+      case 'draw': {
+        actions.finishDrawing();
+        break;
+      }
+      case 'select': {
+        // Selection finished - trigger AI conversation flow
+        const imageData = actions.finishSelection();
+        if (imageData) {
+          try {
+            // Step 1: Transcribe handwriting
+            const base64Image = imageDataToBase64(imageData);
+            const transcription = await sendImageToAI(base64Image);
+
+            // Step 2: Add user message to chat history
+            const userMessage: ChatMessage = {
+              id: Date.now().toString(),
+              role: 'user',
+              content: transcription.transcription,
+              timestamp: Date.now(),
+              isHandwritten: true
+            };
+            actions.addChatMessage(userMessage);
+
+            // Step 3: Get AI response
+            const aiMessages = [...state.chatHistory, userMessage].map(msg => ({
+              role: msg.role,
+              content: msg.content
+            }));
+
+            const aiResponse = await sendChatToAI(aiMessages);
+
+            // Step 4: Add AI message to chat history
+            const aiMessage: ChatMessage = {
+              id: (Date.now() + 1).toString(),
+              role: 'assistant',
+              content: aiResponse,
+              timestamp: Date.now() + 1
+            };
+            actions.addChatMessage(aiMessage);
+
+            // Step 5: Display AI response as text overlay on canvas
+            // Find a good position (below the selection, or at top if needed)
+            const selectionY = state.selectionRect ? Math.max(state.selectionRect.startY, state.selectionRect.endY) : 100;
+
+            const overlay: TextOverlay = {
+              id: aiMessage.id,
+              text: aiResponse,
+              x: 50,
+              y: selectionY + 50,
+              width: canvas.width - 100,
+              fontSize: 24,
+              color: '#4338ca', // indigo-700 for AI responses
+              timestamp: Date.now()
+            };
+            actions.addTextOverlay(overlay);
+
+            // Clear selection rectangle
+            actions.clearSelection();
+          } catch (error) {
+            console.error('Error in AI conversation:', error);
+            alert('Failed to process selection. Please try again.');
+          }
+        }
+        break;
+      }
+      case 'pan': {
+        actions.finishPan();
+        canvas.style.cursor = 'grab';
+        break;
+      }
+    }
+  };
+
+  // Mouse wheel for zoom
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    if (state.currentTool === 'zoom') {
+      e.preventDefault();
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left - state.panX) / state.scale;
+      const y = (e.clientY - rect.top - state.panY) / state.scale;
+
+      actions.zoom(-e.deltaY, x, y);
+    }
+  };
+
+  // Update cursor based on tool
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    switch (state.currentTool) {
+      case 'draw':
+        canvas.style.cursor = 'crosshair';
+        break;
+      case 'select':
+        canvas.style.cursor = 'crosshair';
+        break;
+      case 'pan':
+        canvas.style.cursor = 'grab';
+        break;
+      case 'zoom':
+        canvas.style.cursor = 'zoom-in';
+        break;
+    }
+  }, [state.currentTool]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape to clear selection
+      if (e.key === 'Escape' && state.selectionRect) {
+        actions.clearSelection();
+      }
+
+      // Ctrl/Cmd + Z for undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        actions.undo();
+      }
+
+      // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y for redo
+      if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
+          ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+        e.preventDefault();
+        actions.redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state.selectionRect, actions]);
 
   return (
     <div className="relative w-full h-full bg-white">
@@ -194,7 +397,23 @@ export function Canvas() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerOut={handlePointerUp}
+        onWheel={handleWheel}
       />
+
+      {/* Tool indicator */}
+      <div className="absolute bottom-4 right-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded-md text-sm">
+        <div className="flex items-center gap-2">
+          <span>Tool: <strong>{state.currentTool}</strong></span>
+          {state.currentTool === 'zoom' && (
+            <span className="ml-2">| Zoom: {Math.round(state.scale * 100)}%</span>
+          )}
+        </div>
+        {state.chatHistory.length > 0 && (
+          <div className="text-xs opacity-75 mt-1">
+            {state.chatHistory.length} messages
+          </div>
+        )}
+      </div>
     </div>
   );
 }
