@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions, TypographyGuides, TrainingMode } from '@/lib/types';
+import { TRAINING, CANVAS } from '@/lib/constants';
+import { isValidStroke, sanitizeStroke } from '@/lib/validation';
 
 // Training alphabet prompts
 const LOWERCASE = 'abcdefghijklmnopqrstuvwxyz'.split('');
@@ -11,6 +13,10 @@ const NUMBERS = '0123456789'.split('');
 export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCanvasElement>] {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Refs for avoiding stale closures and cleanup
+  const actionsRef = useRef<CanvasActions | null>(null);
+  const trainingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Tool state
   const [currentTool, setCurrentTool] = useState<Tool>('draw');
 
@@ -19,9 +25,9 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
 
   // Transform state
-  const [scale, setScale] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
+  const [scale, setScale] = useState<number>(CANVAS.DEFAULT_SCALE);
+  const [panX, setPanX] = useState<number>(0);
+  const [panY, setPanY] = useState<number>(0);
 
   // Selection state
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
@@ -33,20 +39,20 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
   // Training mode state
   const [typographyGuides, setTypographyGuides] = useState<TypographyGuides>({
     enabled: false,
-    baseline: 300,
-    xHeight: 50,
-    capHeight: 80,
-    ascender: 100,
-    descender: 70,
-    color: '#3b82f6',
-    opacity: 0.3
+    baseline: TRAINING.DEFAULT_BASELINE,
+    xHeight: TRAINING.DEFAULT_X_HEIGHT,
+    capHeight: TRAINING.DEFAULT_CAP_HEIGHT,
+    ascender: TRAINING.DEFAULT_ASCENDER,
+    descender: TRAINING.DEFAULT_DESCENDER,
+    color: TRAINING.GUIDE_COLOR,
+    opacity: TRAINING.GUIDE_OPACITY
   });
 
   const [trainingMode, setTrainingMode] = useState<TrainingMode>({
     active: false,
     currentPrompt: '',
     currentCharacter: '',
-    samplesRequired: 5,
+    samplesRequired: TRAINING.SAMPLES_PER_CHARACTER,
     samplesCollected: 0,
     style: 'print'
   });
@@ -85,8 +91,8 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       if (currentStroke.length > 0) {
         const newStroke: Stroke = {
           points: currentStroke,
-          color: '#000000',
-          width: 2,
+          color: CANVAS.DEFAULT_COLOR,
+          width: CANVAS.STROKE_WIDTH,
           timestamp: Date.now()
         };
 
@@ -165,8 +171,8 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
 
     // Zoom actions
     zoom: useCallback((delta: number, centerX: number, centerY: number) => {
-      const zoomFactor = delta > 0 ? 1.1 : 0.9;
-      const newScale = Math.max(0.1, Math.min(5, scale * zoomFactor));
+      const zoomFactor = delta > 0 ? CANVAS.ZOOM_FACTOR : 1 / CANVAS.ZOOM_FACTOR;
+      const newScale = Math.max(CANVAS.MIN_SCALE, Math.min(CANVAS.MAX_SCALE, scale * zoomFactor));
 
       // Zoom towards cursor position
       const scaleDiff = newScale - scale;
@@ -209,9 +215,9 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
 
       setTrainingMode({
         active: true,
-        currentPrompt: `Write the letter '${alphabet[0]}' (5 times)`,
+        currentPrompt: `Write the letter '${alphabet[0]}' (${TRAINING.SAMPLES_PER_CHARACTER} times)`,
         currentCharacter: alphabet[0],
-        samplesRequired: 5,
+        samplesRequired: TRAINING.SAMPLES_PER_CHARACTER,
         samplesCollected: 0,
         style
       });
@@ -224,11 +230,17 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
     }, []),
 
     stopTrainingMode: useCallback(() => {
+      // Clear any pending timeouts
+      if (trainingTimeoutRef.current) {
+        clearTimeout(trainingTimeoutRef.current);
+        trainingTimeoutRef.current = null;
+      }
+
       setTrainingMode({
         active: false,
         currentPrompt: '',
         currentCharacter: '',
-        samplesRequired: 5,
+        samplesRequired: TRAINING.SAMPLES_PER_CHARACTER,
         samplesCollected: 0,
         style: 'print'
       });
@@ -259,16 +271,24 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       setCurrentPromptIndex(nextIndex);
       setTrainingMode(prev => ({
         ...prev,
-        currentPrompt: `Write the letter '${alphabet[nextIndex]}' (5 times)`,
+        currentPrompt: `Write the letter '${alphabet[nextIndex]}' (${TRAINING.SAMPLES_PER_CHARACTER} times)`,
         currentCharacter: alphabet[nextIndex],
         samplesCollected: 0
       }));
     }, [trainingMode.style, currentPromptIndex]),
 
     submitTrainingSample: useCallback((stroke: Stroke) => {
+      // Validate and sanitize stroke before submission
+      const sanitized = sanitizeStroke(stroke);
+
+      if (!sanitized || !isValidStroke(sanitized)) {
+        console.warn('[Training] Invalid stroke submitted, skipping');
+        return;
+      }
+
       // Add training metadata to stroke
       const trainedStroke: Stroke = {
-        ...stroke,
+        ...sanitized,
         character: trainingMode.currentCharacter,
         strokeOrder: trainingMode.samplesCollected + 1,
         normalized: true // Assume normalized to guides
@@ -284,12 +304,19 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
 
       // Auto-advance when we have enough samples
       if (newSamplesCollected >= trainingMode.samplesRequired) {
-        // Use setTimeout to avoid state update conflicts
-        setTimeout(() => {
-          actions.nextTrainingPrompt();
-        }, 100);
+        // Clear any existing timeout to prevent race conditions
+        if (trainingTimeoutRef.current) {
+          clearTimeout(trainingTimeoutRef.current);
+        }
+
+        // Use ref to avoid stale closure - safe reference to actions
+        trainingTimeoutRef.current = setTimeout(() => {
+          if (actionsRef.current) {
+            actionsRef.current.nextTrainingPrompt();
+          }
+        }, TRAINING.AUTO_ADVANCE_DELAY_MS);
       }
-    }, [trainingMode]),
+    }, [trainingMode.currentCharacter, trainingMode.samplesCollected, trainingMode.samplesRequired]),
 
     // History actions
     undo: useCallback(() => {
@@ -324,7 +351,7 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       setSelectionRect(null);
       setChatHistory([]);
       setTextOverlays([]);
-      setScale(1);
+      setScale(CANVAS.DEFAULT_SCALE);
       setPanX(0);
       setPanY(0);
     }, []),
@@ -336,6 +363,21 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       return ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
     }, [])
   };
+
+  // Update actionsRef whenever actions object changes
+  // This allows setTimeout callbacks to always use the latest actions
+  useEffect(() => {
+    actionsRef.current = actions;
+  });
+
+  // Cleanup on unmount - clear any pending timeouts
+  useEffect(() => {
+    return () => {
+      if (trainingTimeoutRef.current) {
+        clearTimeout(trainingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const state: CanvasState = {
     currentTool,

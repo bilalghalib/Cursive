@@ -118,42 +118,6 @@ export function Toolbar({ state, actions, onExportJSON, onExportPDF, onImportJSO
 
         {/* Utility buttons */}
         <div className="flex gap-1 ml-auto">
-          {/* Training mode toggle */}
-          {!state.trainingMode.active ? (
-            <button
-              onClick={() => actions.startTrainingMode('print')}
-              className="px-3 py-2 rounded-md bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
-              title="Start Handwriting Training"
-            >
-              <i className="fas fa-graduation-cap mr-1" />
-              <span className="text-sm hidden sm:inline">Train AI</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => actions.stopTrainingMode()}
-              className="px-3 py-2 rounded-md bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-              title="Stop Training"
-            >
-              <i className="fas fa-stop mr-1" />
-              <span className="text-sm hidden sm:inline">Stop Training</span>
-            </button>
-          )}
-
-          {/* Typography guides toggle */}
-          <button
-            onClick={() => actions.toggleTypographyGuides()}
-            className={`
-              px-3 py-2 rounded-md transition-colors
-              ${state.typographyGuides.enabled
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }
-            `}
-            title={state.typographyGuides.enabled ? 'Hide Guides' : 'Show Guides'}
-          >
-            <i className="fas fa-ruler-horizontal" />
-          </button>
-
           <button
             onClick={handleNewSession}
             className="px-3 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
@@ -258,23 +222,6 @@ export function Toolbar({ state, actions, onExportJSON, onExportPDF, onImportJSO
           <UserMenu onLoginClick={() => setShowAuthModal(true)} />
         </div>
       </div>
-
-      {/* Training mode status bar */}
-      {state.trainingMode.active && (
-        <div className="bg-green-50 px-4 py-2 border-t border-green-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="font-medium text-green-900">Training Mode Active</span>
-              <span className="text-sm text-green-700 ml-4">
-                {state.trainingMode.currentPrompt}
-              </span>
-            </div>
-            <div className="text-sm text-green-700">
-              Sample {state.trainingMode.samplesCollected} of {state.trainingMode.samplesRequired}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Status bar */}
       {(state.chatHistory.length > 0 || state.textOverlays.length > 0) && (
