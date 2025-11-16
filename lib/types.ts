@@ -150,3 +150,41 @@ export interface TranscriptionResult {
   transcription: string;
   tags: string[];
 }
+
+// Handwriting training types
+export interface HandwritingProfile {
+  id: string;
+  userId: string;
+  name: string;              // "Bilal's Handwriting"
+  description?: string;      // "Neat cursive style"
+  style: 'print' | 'cursive' | 'mixed';
+
+  // Training data
+  trainingData: {
+    alphabet: { [letter: string]: Stroke[] };
+    combinations: { [combo: string]: Stroke[] };
+    words: { [word: string]: Stroke[] };
+    phrases: { [phrase: string]: Stroke[] };
+  };
+
+  // Statistics
+  stats: {
+    totalSamples: number;
+    completionPercentage: number;
+    avgSimilarityScore: number;
+    trainedAt: number;
+    lastUpdated: number;
+  };
+
+  // Model state (trained AI model)
+  modelData?: {
+    letterShapes: any;         // Learned letter forms
+    connections: any;          // Join patterns
+    styleParams: {
+      avgSlant: number;
+      avgSpacing: number;
+      avgPressure: number;
+      variationLevel: number;
+    };
+  };
+}

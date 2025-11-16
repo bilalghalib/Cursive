@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions } from '@/lib/types';
+import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions, TypographyGuides, TrainingMode } from '@/lib/types';
 
 export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCanvasElement>] {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -24,6 +24,27 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
   // Chat/Conversation state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
+
+  // Training state
+  const [typographyGuides, setTypographyGuides] = useState<TypographyGuides>({
+    enabled: false,
+    baseline: 300,
+    xHeight: 50,
+    capHeight: 80,
+    ascender: 100,
+    descender: 70,
+    color: '#3b82f6',
+    opacity: 0.3
+  });
+
+  const [trainingMode, setTrainingMode] = useState<TrainingMode>({
+    active: false,
+    currentPrompt: '',
+    currentCharacter: '',
+    samplesRequired: 5,
+    samplesCollected: 0,
+    style: 'print'
+  });
 
   // History
   const [undoStack, setUndoStack] = useState<Stroke[][]>([[]]);
@@ -163,6 +184,46 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       setTextOverlays([]);
     }, []),
 
+    // Typography & Training actions
+    toggleTypographyGuides: useCallback(() => {
+      setTypographyGuides(prev => ({ ...prev, enabled: !prev.enabled }));
+    }, []),
+
+    updateTypographyGuides: useCallback((guides: Partial<TypographyGuides>) => {
+      setTypographyGuides(prev => ({ ...prev, ...guides }));
+    }, []),
+
+    startTrainingMode: useCallback((style: 'print' | 'cursive') => {
+      setTrainingMode({
+        active: true,
+        currentPrompt: 'Write the letter "a"',
+        currentCharacter: 'a',
+        samplesRequired: 5,
+        samplesCollected: 0,
+        style
+      });
+      setTypographyGuides(prev => ({ ...prev, enabled: true }));
+    }, []),
+
+    stopTrainingMode: useCallback(() => {
+      setTrainingMode(prev => ({ ...prev, active: false }));
+    }, []),
+
+    nextTrainingPrompt: useCallback(() => {
+      // This would advance to the next character/word in the training sequence
+      // For now, just increment the samples collected
+      setTrainingMode(prev => ({
+        ...prev,
+        samplesCollected: prev.samplesCollected + 1
+      }));
+    }, []),
+
+    submitTrainingSample: useCallback((stroke: Stroke) => {
+      // This would save the training sample to the database
+      // For now, just log it
+      console.log('Training sample submitted:', stroke);
+    }, []),
+
     // History actions
     undo: useCallback(() => {
       if (undoStack.length > 1) {
@@ -219,6 +280,8 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
     selectionRect,
     chatHistory,
     textOverlays,
+    typographyGuides,
+    trainingMode,
     undoStack,
     redoStack
   };

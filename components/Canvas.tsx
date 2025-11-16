@@ -48,7 +48,7 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
   // Redraw canvas whenever state changes
   useEffect(() => {
     redrawCanvas();
-  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect, state.textOverlays]);
+  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect, state.textOverlays, state.typographyGuides]);
 
   const redrawCanvas = () => {
     const canvas = canvasRef.current;
@@ -63,6 +63,9 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
+
+    // Draw typography guides (before transformations, so they're always visible)
+    drawTypographyGuides(ctx);
 
     // Apply transformations
     ctx.save();
@@ -161,6 +164,45 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     // Draw semi-transparent fill
     ctx.fillStyle = 'rgba(37, 99, 235, 0.1)';
     ctx.fillRect(minX, minY, width, height);
+    ctx.restore();
+  };
+
+  const drawTypographyGuides = (ctx: CanvasRenderingContext2D) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !state.typographyGuides.enabled) return;
+
+    const guides = state.typographyGuides;
+    const width = canvas.width;
+
+    ctx.save();
+    ctx.strokeStyle = guides.color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = guides.opacity;
+    ctx.setLineDash([5, 3]);
+
+    // Draw guide lines
+    const lines = [
+      { y: guides.baseline - guides.ascender, label: 'Ascender' },
+      { y: guides.baseline - guides.capHeight, label: 'Cap Height' },
+      { y: guides.baseline - guides.xHeight, label: 'X-Height' },
+      { y: guides.baseline, label: 'BASELINE', bold: true },
+      { y: guides.baseline + guides.descender, label: 'Descender' }
+    ];
+
+    lines.forEach(line => {
+      ctx.beginPath();
+      ctx.moveTo(0, line.y);
+      ctx.lineTo(width, line.y);
+      ctx.stroke();
+
+      // Draw label
+      ctx.globalAlpha = guides.opacity * 1.5;
+      ctx.fillStyle = guides.color;
+      ctx.font = line.bold ? 'bold 12px sans-serif' : '10px sans-serif';
+      ctx.fillText(line.label, 10, line.y - 5);
+      ctx.globalAlpha = guides.opacity;
+    });
+
     ctx.restore();
   };
 
