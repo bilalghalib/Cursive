@@ -4,6 +4,9 @@ export const TRAINING = {
   /** Number of samples to collect per character */
   SAMPLES_PER_CHARACTER: 5,
 
+  /** Number of variations to collect per item (for diversity) */
+  VARIATIONS_PER_ITEM: 3,
+
   /** Delay before auto-advancing to next character (ms) */
   AUTO_ADVANCE_DELAY_MS: 100,
 
@@ -27,6 +30,23 @@ export const TRAINING = {
 
   /** Descender depth (px below baseline) */
   DEFAULT_DESCENDER: 70,
+
+  /** Training character sets */
+  ALPHABET_LOWERCASE: 'abcdefghijklmnopqrstuvwxyz'.split(''),
+  ALPHABET_UPPERCASE: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+  NUMBERS: '0123456789'.split(''),
+
+  /** Common two-letter ligatures for cursive training */
+  LIGATURES: [
+    'tt', 'ff', 'th', 'sh', 'ch', 'wh', 'oo', 'll', 'ss', 'ee',
+    'qu', 'ck', 'ng', 'st', 'nt', 'nd', 'ct', 'ph', 'rr', 'pp'
+  ],
+
+  /** Common words for natural handwriting flow */
+  COMMON_WORDS: [
+    'and', 'the', 'is', 'of', 'to', 'in', 'it', 'for', 'you', 'that',
+    'with', 'from', 'have', 'this', 'but'
+  ],
 } as const;
 
 export const CANVAS = {

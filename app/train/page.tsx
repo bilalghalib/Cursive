@@ -1,9 +1,18 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useCanvas } from '@/hooks/useCanvas';
 import { Download, X, GraduationCap, Lock } from 'lucide-react';
-import { STORAGE_KEYS } from '@/lib/constants';
+import { STORAGE_KEYS, TRAINING } from '@/lib/constants';
+
+// Training phases
+type TrainingPhase = 'cursiveLower' | 'cursiveUpper' | 'numbers' | 'ligatures' | 'words';
+
+interface TrainingProgress {
+  phase: TrainingPhase;
+  itemIndex: number;
+  variationIndex: number;
+}
 
 export default function TrainPage() {
   const [state, actions, canvasRef] = useCanvas();
@@ -11,6 +20,11 @@ export default function TrainPage() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [trainingProgress, setTrainingProgress] = useState<TrainingProgress>({
+    phase: 'cursiveLower',
+    itemIndex: 0,
+    variationIndex: 0
+  });
 
   // Developer password (in production, use env var or better auth)
   const DEV_PASSWORD = process.env.NEXT_PUBLIC_TRAIN_PASSWORD || 'cursive-dev-2024';
@@ -20,9 +34,105 @@ export default function TrainPage() {
 
   if (isAuthorized && !hasStarted.current && !state.trainingMode.active) {
     hasStarted.current = true;
-    actions.startTrainingMode('print');
+    actions.startTrainingMode('cursive');
     actions.toggleTypographyGuides();
   }
+
+  // Get current training item based on phase
+  const getCurrentItem = (): string => {
+    const { phase, itemIndex } = trainingProgress;
+
+    switch (phase) {
+      case 'cursiveLower':
+        return TRAINING.ALPHABET_LOWERCASE[itemIndex] || 'a';
+      case 'cursiveUpper':
+        return TRAINING.ALPHABET_UPPERCASE[itemIndex] || 'A';
+      case 'numbers':
+        return TRAINING.NUMBERS[itemIndex] || '0';
+      case 'ligatures':
+        return TRAINING.LIGATURES[itemIndex] || 'tt';
+      case 'words':
+        return TRAINING.COMMON_WORDS[itemIndex] || 'and';
+      default:
+        return 'a';
+    }
+  };
+
+  const getPhaseLabel = (phase: TrainingPhase): string => {
+    switch (phase) {
+      case 'cursiveLower': return 'Cursive Lowercase';
+      case 'cursiveUpper': return 'Cursive Uppercase';
+      case 'numbers': return 'Numbers';
+      case 'ligatures': return 'Ligatures';
+      case 'words': return 'Common Words';
+    }
+  };
+
+  const getTotalItems = (phase: TrainingPhase): number => {
+    switch (phase) {
+      case 'cursiveLower': return TRAINING.ALPHABET_LOWERCASE.length;
+      case 'cursiveUpper': return TRAINING.ALPHABET_UPPERCASE.length;
+      case 'numbers': return TRAINING.NUMBERS.length;
+      case 'ligatures': return TRAINING.LIGATURES.length;
+      case 'words': return TRAINING.COMMON_WORDS.length;
+    }
+  };
+
+  const advanceTraining = () => {
+    setTrainingProgress(prev => {
+      const totalItems = getTotalItems(prev.phase);
+      const nextVariation = prev.variationIndex + 1;
+
+      // If we've collected all variations for this item
+      if (nextVariation >= TRAINING.VARIATIONS_PER_ITEM) {
+        const nextItem = prev.itemIndex + 1;
+
+        // If we've finished all items in this phase
+        if (nextItem >= totalItems) {
+          // Move to next phase
+          const phases: TrainingPhase[] = ['cursiveLower', 'cursiveUpper', 'numbers', 'ligatures', 'words'];
+          const currentPhaseIndex = phases.indexOf(prev.phase);
+
+          if (currentPhaseIndex < phases.length - 1) {
+            return {
+              phase: phases[currentPhaseIndex + 1],
+              itemIndex: 0,
+              variationIndex: 0
+            };
+          } else {
+            // Training complete!
+            actions.stopTrainingMode();
+            return prev;
+          }
+        }
+
+        // Next item, reset variations
+        return {
+          ...prev,
+          itemIndex: nextItem,
+          variationIndex: 0
+        };
+      }
+
+      // Next variation of same item
+      return {
+        ...prev,
+        variationIndex: nextVariation
+      };
+    });
+  };
+
+  // Update the training prompt when progress changes
+  useEffect(() => {
+    if (state.trainingMode.active) {
+      const currentItem = getCurrentItem();
+      const variation = trainingProgress.variationIndex + 1;
+      const prompt = `Write: "${currentItem}" (variation ${variation}/${TRAINING.VARIATIONS_PER_ITEM})`;
+
+      // We'd need to add a way to update the current prompt in the training mode
+      // For now, this is a placeholder
+    }
+  }, [trainingProgress, state.trainingMode.active]);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,15 +244,23 @@ export default function TrainPage() {
 
     // Submit the stroke as a training sample
     if (state.currentStroke.length > 0) {
+      const currentItem = getCurrentItem();
       const stroke = {
         points: state.currentStroke,
         color: '#000000',
         width: 2,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        // Add metadata for training
+        character: currentItem,
+        phase: trainingProgress.phase,
+        variation: trainingProgress.variationIndex + 1
       };
 
       actions.submitTrainingSample(stroke);
       actions.finishDrawing();
+
+      // Advance to next item/variation
+      advanceTraining();
     }
   };
 
@@ -193,9 +311,45 @@ export default function TrainPage() {
     }
   };
 
-  const totalCharacters = state.trainingMode.style === 'print' ? 62 : 26;
-  const currentIndex = Math.floor(state.drawings.length / 5);
-  const progress = (currentIndex / totalCharacters) * 100;
+  // Calculate total progress
+  const getTotalTrainingItems = () => {
+    return (
+      TRAINING.ALPHABET_LOWERCASE.length +
+      TRAINING.ALPHABET_UPPERCASE.length +
+      TRAINING.NUMBERS.length +
+      TRAINING.LIGATURES.length +
+      TRAINING.COMMON_WORDS.length
+    );
+  };
+
+  const getCurrentProgressIndex = () => {
+    const { phase, itemIndex } = trainingProgress;
+    let index = 0;
+
+    // Add completed phases
+    if (phase === 'cursiveUpper' || phase === 'numbers' || phase === 'ligatures' || phase === 'words') {
+      index += TRAINING.ALPHABET_LOWERCASE.length;
+    }
+    if (phase === 'numbers' || phase === 'ligatures' || phase === 'words') {
+      index += TRAINING.ALPHABET_UPPERCASE.length;
+    }
+    if (phase === 'ligatures' || phase === 'words') {
+      index += TRAINING.NUMBERS.length;
+    }
+    if (phase === 'words') {
+      index += TRAINING.LIGATURES.length;
+    }
+
+    // Add current item index
+    index += itemIndex;
+
+    return index;
+  };
+
+  const totalItems = getTotalTrainingItems();
+  const currentIndex = getCurrentProgressIndex();
+  const progress = (currentIndex / totalItems) * 100;
+  const currentItem = getCurrentItem();
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -226,28 +380,48 @@ export default function TrainPage() {
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="text-lg font-semibold text-blue-900">
-                  {state.trainingMode.currentPrompt}
+                <h2 className="text-2xl font-bold text-blue-900 mb-1">
+                  Write: "{currentItem}"
                 </h2>
                 <p className="text-sm text-blue-700">
-                  Sample {state.trainingMode.samplesCollected} of {state.trainingMode.samplesRequired}
+                  {getPhaseLabel(trainingProgress.phase)} •
+                  Variation {trainingProgress.variationIndex + 1} of {TRAINING.VARIATIONS_PER_ITEM}
                 </p>
               </div>
 
               <div className="text-right">
                 <p className="text-sm font-medium text-blue-900">
-                  Character {currentIndex + 1} of {totalCharacters}
+                  Item {currentIndex + 1} of {totalItems}
                 </p>
                 <p className="text-xs text-blue-700">{Math.round(progress)}% complete</p>
               </div>
             </div>
 
             {/* Progress bar */}
-            <div className="w-full bg-blue-200 rounded-full h-2">
+            <div className="w-full bg-blue-200 rounded-full h-2 mb-2">
               <div
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
+            </div>
+
+            {/* Phase indicator */}
+            <div className="flex gap-2 text-xs">
+              <span className={`px-2 py-1 rounded ${trainingProgress.phase === 'cursiveLower' ? 'bg-blue-600 text-white' : 'bg-blue-200 text-blue-700'}`}>
+                Lowercase
+              </span>
+              <span className={`px-2 py-1 rounded ${trainingProgress.phase === 'cursiveUpper' ? 'bg-blue-600 text-white' : 'bg-blue-200 text-blue-700'}`}>
+                Uppercase
+              </span>
+              <span className={`px-2 py-1 rounded ${trainingProgress.phase === 'numbers' ? 'bg-blue-600 text-white' : 'bg-blue-200 text-blue-700'}`}>
+                Numbers
+              </span>
+              <span className={`px-2 py-1 rounded ${trainingProgress.phase === 'ligatures' ? 'bg-blue-600 text-white' : 'bg-blue-200 text-blue-700'}`}>
+                Ligatures
+              </span>
+              <span className={`px-2 py-1 rounded ${trainingProgress.phase === 'words' ? 'bg-blue-600 text-white' : 'bg-blue-200 text-blue-700'}`}>
+                Words
+              </span>
             </div>
           </div>
         </div>
