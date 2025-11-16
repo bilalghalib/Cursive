@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions } from '@/lib/types';
+import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions, TypographyGuides, TrainingMode } from '@/lib/types';
+
+// Training alphabet prompts
+const LOWERCASE = 'abcdefghijklmnopqrstuvwxyz'.split('');
+const UPPERCASE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const NUMBERS = '0123456789'.split('');
 
 export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCanvasElement>] {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -24,6 +29,30 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
   // Chat/Conversation state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
+
+  // Training mode state
+  const [typographyGuides, setTypographyGuides] = useState<TypographyGuides>({
+    enabled: false,
+    baseline: 300,
+    xHeight: 50,
+    capHeight: 80,
+    ascender: 100,
+    descender: 70,
+    color: '#3b82f6',
+    opacity: 0.3
+  });
+
+  const [trainingMode, setTrainingMode] = useState<TrainingMode>({
+    active: false,
+    currentPrompt: '',
+    currentCharacter: '',
+    samplesRequired: 5,
+    samplesCollected: 0,
+    style: 'print'
+  });
+
+  const [trainingData, setTrainingData] = useState<Stroke[]>([]);
+  const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
 
   // History
   const [undoStack, setUndoStack] = useState<Stroke[][]>([[]]);
@@ -163,6 +192,105 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       setTextOverlays([]);
     }, []),
 
+    // Typography & Training actions
+    toggleTypographyGuides: useCallback(() => {
+      setTypographyGuides(prev => ({ ...prev, enabled: !prev.enabled }));
+    }, []),
+
+    updateTypographyGuides: useCallback((guides: Partial<TypographyGuides>) => {
+      setTypographyGuides(prev => ({ ...prev, ...guides }));
+    }, []),
+
+    startTrainingMode: useCallback((style: 'print' | 'cursive') => {
+      // Determine alphabet based on style
+      const alphabet = style === 'print'
+        ? [...LOWERCASE, ...UPPERCASE, ...NUMBERS]
+        : LOWERCASE; // Cursive focuses on lowercase connections
+
+      setTrainingMode({
+        active: true,
+        currentPrompt: `Write the letter '${alphabet[0]}' (5 times)`,
+        currentCharacter: alphabet[0],
+        samplesRequired: 5,
+        samplesCollected: 0,
+        style
+      });
+
+      setCurrentPromptIndex(0);
+      setTrainingData([]);
+
+      // Auto-enable typography guides
+      setTypographyGuides(prev => ({ ...prev, enabled: true }));
+    }, []),
+
+    stopTrainingMode: useCallback(() => {
+      setTrainingMode({
+        active: false,
+        currentPrompt: '',
+        currentCharacter: '',
+        samplesRequired: 5,
+        samplesCollected: 0,
+        style: 'print'
+      });
+
+      setCurrentPromptIndex(0);
+
+      // Optionally disable guides
+      setTypographyGuides(prev => ({ ...prev, enabled: false }));
+    }, []),
+
+    nextTrainingPrompt: useCallback(() => {
+      const alphabet = trainingMode.style === 'print'
+        ? [...LOWERCASE, ...UPPERCASE, ...NUMBERS]
+        : LOWERCASE;
+
+      const nextIndex = currentPromptIndex + 1;
+
+      if (nextIndex >= alphabet.length) {
+        // Training complete!
+        setTrainingMode(prev => ({
+          ...prev,
+          active: false,
+          currentPrompt: 'Training complete!',
+        }));
+        return;
+      }
+
+      setCurrentPromptIndex(nextIndex);
+      setTrainingMode(prev => ({
+        ...prev,
+        currentPrompt: `Write the letter '${alphabet[nextIndex]}' (5 times)`,
+        currentCharacter: alphabet[nextIndex],
+        samplesCollected: 0
+      }));
+    }, [trainingMode.style, currentPromptIndex]),
+
+    submitTrainingSample: useCallback((stroke: Stroke) => {
+      // Add training metadata to stroke
+      const trainedStroke: Stroke = {
+        ...stroke,
+        character: trainingMode.currentCharacter,
+        strokeOrder: trainingMode.samplesCollected + 1,
+        normalized: true // Assume normalized to guides
+      };
+
+      setTrainingData(prev => [...prev, trainedStroke]);
+
+      const newSamplesCollected = trainingMode.samplesCollected + 1;
+      setTrainingMode(prev => ({
+        ...prev,
+        samplesCollected: newSamplesCollected
+      }));
+
+      // Auto-advance when we have enough samples
+      if (newSamplesCollected >= trainingMode.samplesRequired) {
+        // Use setTimeout to avoid state update conflicts
+        setTimeout(() => {
+          actions.nextTrainingPrompt();
+        }, 100);
+      }
+    }, [trainingMode]),
+
     // History actions
     undo: useCallback(() => {
       if (undoStack.length > 1) {
@@ -219,6 +347,8 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
     selectionRect,
     chatHistory,
     textOverlays,
+    typographyGuides,
+    trainingMode,
     undoStack,
     redoStack
   };
