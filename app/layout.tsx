@@ -4,6 +4,9 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Cursive - AI-Powered Digital Notebook',
   description: 'Handwriting input with Claude AI conversation',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
