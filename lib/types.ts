@@ -11,6 +11,12 @@ export interface Stroke {
   color: string;
   width: number;
   timestamp?: number;
+  // Training metadata (optional)
+  character?: string;        // What letter/character is this?
+  strokeOrder?: number;      // Which stroke in the character (1st, 2nd, etc.)
+  position?: 'start' | 'middle' | 'end';  // Position in word
+  connectedTo?: string;      // Next character if cursive
+  normalized?: boolean;      // Has this been normalized to guides?
 }
 
 export type Tool = 'draw' | 'select' | 'pan' | 'zoom';
@@ -34,6 +40,28 @@ export interface TextOverlay {
   timestamp: number;
 }
 
+// Typography guides (for handwriting training)
+export interface TypographyGuides {
+  enabled: boolean;
+  baseline: number;        // Y-coordinate where letters sit
+  xHeight: number;         // Height of lowercase letters (e.g., 'x')
+  capHeight: number;       // Height of capital letters
+  ascender: number;        // Top line (for b, d, h, k, l, t)
+  descender: number;       // Bottom line (for g, j, p, q, y)
+  color: string;          // Color of guide lines
+  opacity: number;        // 0-1, how visible the guides are
+}
+
+// Training mode state
+export interface TrainingMode {
+  active: boolean;
+  currentPrompt: string;   // "Write the letter 'a'"
+  currentCharacter: string; // 'a'
+  samplesRequired: number;  // How many samples to collect
+  samplesCollected: number; // How many we have so far
+  style: 'print' | 'cursive'; // Writing style
+}
+
 export interface CanvasState {
   // Tool state
   currentTool: Tool;
@@ -53,6 +81,10 @@ export interface CanvasState {
   // Chat/Conversation state
   chatHistory: ChatMessage[];
   textOverlays: TextOverlay[];
+
+  // Training mode
+  typographyGuides: TypographyGuides;
+  trainingMode: TrainingMode;
 
   // History
   undoStack: Stroke[][];
@@ -87,6 +119,14 @@ export interface CanvasActions {
   addTextOverlay: (overlay: TextOverlay) => void;
   removeTextOverlay: (id: string) => void;
   clearTextOverlays: () => void;
+
+  // Typography & Training actions
+  toggleTypographyGuides: () => void;
+  updateTypographyGuides: (guides: Partial<TypographyGuides>) => void;
+  startTrainingMode: (style: 'print' | 'cursive') => void;
+  stopTrainingMode: () => void;
+  nextTrainingPrompt: () => void;
+  submitTrainingSample: (stroke: Stroke) => void;
 
   // History actions
   undo: () => void;
