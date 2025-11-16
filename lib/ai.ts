@@ -3,8 +3,11 @@
  * Provides functions to interact with Claude API via Next.js API route
  */
 
+import { addStyleSystemPrompt, parseAIResponse as parseStyleResponse } from './aiStylePrompt';
+import type { StructuredAIResponse } from './types';
+
 export interface AIMessage {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string | Array<{ type: string; text?: string; source?: any }>;
 }
 
@@ -98,18 +101,20 @@ export async function sendImageToAI(
  * @param chatHistory Array of messages
  * @param onProgress Optional callback for streaming progress
  * @param config Optional AI configuration
- * @returns AI response text
+ * @param enableStyleMetadata Whether to enable handwriting style metadata in responses
+ * @returns AI response text (or structured response if enableStyleMetadata is true)
  */
 export async function sendChatToAI(
   chatHistory: AIMessage[],
   onProgress?: (text: string) => void,
-  config: Partial<AIConfig> = {}
+  config: Partial<AIConfig> = {},
+  enableStyleMetadata: boolean = false
 ): Promise<string> {
   try {
     const fullConfig = { ...DEFAULT_CONFIG, ...config };
 
     // Filter out any messages with empty content
-    const validMessages = chatHistory.filter(msg => {
+    let validMessages = chatHistory.filter(msg => {
       if (typeof msg.content === 'string') {
         return msg.content.trim() !== '';
       }
@@ -118,6 +123,23 @@ export async function sendChatToAI(
 
     if (validMessages.length === 0) {
       throw new Error('No valid messages to send to AI');
+    }
+
+    // Add style system prompt if enabled
+    if (enableStyleMetadata) {
+      // Convert to simple format for addStyleSystemPrompt
+      const simpleMessages = validMessages.map(msg => ({
+        role: msg.role,
+        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
+      }));
+
+      const withSystemPrompt = addStyleSystemPrompt(simpleMessages, true);
+
+      // Convert back to AIMessage format
+      validMessages = withSystemPrompt.map(msg => ({
+        role: msg.role as 'user' | 'assistant' | 'system',
+        content: msg.content
+      }));
     }
 
     const response = await fetch('/api/claude', {
@@ -152,6 +174,22 @@ export async function sendChatToAI(
     console.error('Error in AI chat service:', error);
     throw error;
   }
+}
+
+/**
+ * Send chat messages to Claude with style metadata support
+ * Returns structured response with text and optional style metadata
+ *
+ * @param chatHistory Array of messages
+ * @param config Optional AI configuration
+ * @returns Structured response with text and style metadata
+ */
+export async function sendChatToAIWithStyle(
+  chatHistory: AIMessage[],
+  config: Partial<AIConfig> = {}
+): Promise<StructuredAIResponse> {
+  const rawResponse = await sendChatToAI(chatHistory, undefined, config, true);
+  return parseStyleResponse(rawResponse);
 }
 
 /**

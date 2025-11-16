@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useCanvas } from '@/hooks/useCanvas';
 import { Download, X, GraduationCap, Lock } from 'lucide-react';
 import { STORAGE_KEYS, TRAINING } from '@/lib/constants';
+import { addConnectionPoints } from '@/lib/connectionPoints';
 
 // Training phases
 type TrainingPhase = 'cursiveLower' | 'cursiveUpper' | 'numbers' | 'ligatures' | 'words';
@@ -245,7 +246,11 @@ export default function TrainPage() {
     // Submit the stroke as a training sample
     if (state.currentStroke.length > 0) {
       const currentItem = getCurrentItem();
-      const stroke = {
+      const isLigaturePhase = trainingProgress.phase === 'ligatures';
+      const isWordPhase = trainingProgress.phase === 'words';
+
+      // Create base stroke and add connection points
+      const baseStroke: import('@/lib/types').Stroke = {
         points: state.currentStroke,
         color: '#000000',
         width: 2,
@@ -253,10 +258,19 @@ export default function TrainPage() {
         // Add metadata for training
         character: currentItem,
         phase: trainingProgress.phase,
-        variation: trainingProgress.variationIndex + 1
+        variation: trainingProgress.variationIndex + 1,
+        isLigature: isLigaturePhase || isWordPhase
       };
 
-      actions.submitTrainingSample(stroke);
+      // Calculate and add connection points (entry/exit points for cursive flow)
+      const strokeWithConnections = addConnectionPoints(baseStroke);
+
+      // Log connection points for debugging
+      if (strokeWithConnections.entryPoint && strokeWithConnections.exitPoint) {
+        console.log(`[Training] ${currentItem} - Entry: (${Math.round(strokeWithConnections.entryPoint.x)}, ${Math.round(strokeWithConnections.entryPoint.y)}, ${Math.round(strokeWithConnections.entryPoint.angle)}°), Exit: (${Math.round(strokeWithConnections.exitPoint.x)}, ${Math.round(strokeWithConnections.exitPoint.y)}, ${Math.round(strokeWithConnections.exitPoint.angle)}°)`);
+      }
+
+      actions.submitTrainingSample(strokeWithConnections);
       actions.finishDrawing();
 
       // Advance to next item/variation

@@ -6,6 +6,13 @@ export interface Point {
   pressure?: number; // For pressure sensitivity
 }
 
+export interface ConnectionPoint {
+  x: number;
+  y: number;
+  angle: number;    // Exit/entry angle in degrees (for smooth connections)
+  pressure: number; // Pressure at connection point
+}
+
 export interface Stroke {
   points: Point[];
   color: string;
@@ -17,6 +24,15 @@ export interface Stroke {
   position?: 'start' | 'middle' | 'end';  // Position in word
   connectedTo?: string;      // Next character if cursive
   normalized?: boolean;      // Has this been normalized to guides?
+
+  // Connection points for cursive flow (V2)
+  entryPoint?: ConnectionPoint;  // Where the letter starts (for connecting FROM previous)
+  exitPoint?: ConnectionPoint;   // Where the letter ends (for connecting TO next)
+  isLigature?: boolean;          // True if this is a multi-character ligature (e.g., "tt")
+
+  // Training phase metadata (V2)
+  phase?: string;            // Which training phase: 'cursiveLower', 'ligatures', etc.
+  variation?: number;        // Which variation (1, 2, or 3)
 }
 
 export type Tool = 'draw' | 'select' | 'pan' | 'zoom';
@@ -144,6 +160,27 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   isHandwritten?: boolean;
+  // AI response style metadata (V2)
+  styleMetadata?: AIStyleMetadata;
+}
+
+// AI response with style/quality metadata
+export interface AIStyleMetadata {
+  mood?: 'excited' | 'calm' | 'formal' | 'casual' | 'urgent' | 'thoughtful';
+  confidence?: number;      // 0-1: How confident is the mood detection?
+  customParams?: {          // Custom handwriting parameters
+    jitter?: number;        // 0-1: Random variation
+    slant?: number;         // -0.5 to 0.5: Character slant
+    messiness?: number;     // 0-1: Overall messiness
+    speed?: number;         // 0-1: Writing speed (affects smoothness)
+  };
+  description?: string;     // Human-readable: "enthusiastic and energetic"
+}
+
+// Structured AI response format
+export interface StructuredAIResponse {
+  text: string;
+  style?: AIStyleMetadata;
 }
 
 export interface TranscriptionResult {
