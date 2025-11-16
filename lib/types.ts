@@ -74,3 +74,17 @@ export interface CanvasActions {
   clearAll: () => void;
   getCanvasImageData: () => ImageData | null;
 }
+
+// Chat types
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  isHandwritten?: boolean;
+}
+
+export interface TranscriptionResult {
+  transcription: string;
+  tags: string[];
+}

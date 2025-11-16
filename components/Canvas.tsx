@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { CanvasState, CanvasActions, Stroke } from '@/lib/types';
+import type { CanvasState, CanvasActions, Stroke, TranscriptionResult } from '@/lib/types';
+import { sendImageToAI, imageDataToBase64 } from '@/lib/ai';
 
 interface CanvasProps {
   state: CanvasState;
   actions: CanvasActions;
   canvasRef: React.RefObject<HTMLCanvasElement>;
+  onSelectionComplete?: (imageData: ImageData | null, transcription?: TranscriptionResult) => void;
 }
 
-export function Canvas({ state, actions, canvasRef }: CanvasProps) {
+export function Canvas({ state, actions, canvasRef, onSelectionComplete }: CanvasProps) {
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -207,7 +209,7 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     }
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const handlePointerUp = async (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -220,11 +222,26 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
         break;
       }
       case 'select': {
-        // Selection finished - could trigger AI transcription here
+        // Selection finished - trigger AI transcription
         const imageData = actions.finishSelection();
-        if (imageData) {
-          // TODO: Send to AI for transcription
-          console.log('Selection captured:', imageData);
+        if (imageData && onSelectionComplete) {
+          try {
+            // Convert ImageData to base64
+            const base64Image = imageDataToBase64(imageData);
+
+            // Send to AI for transcription
+            const transcription = await sendImageToAI(base64Image);
+
+            // Trigger callback with both imageData and transcription
+            onSelectionComplete(imageData, transcription);
+
+            // Clear selection rectangle
+            actions.clearSelection();
+          } catch (error) {
+            console.error('Error transcribing selection:', error);
+            // Still open chat panel but without transcription
+            onSelectionComplete(imageData);
+          }
         }
         break;
       }
