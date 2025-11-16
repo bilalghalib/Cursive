@@ -33,6 +33,10 @@ export interface Stroke {
   // Training phase metadata (V2)
   phase?: string;            // Which training phase: 'cursiveLower', 'ligatures', etc.
   variation?: number;        // Which variation (1, 2, or 3)
+
+  // AI-generated metadata (V2)
+  isAIGenerated?: boolean;   // True if synthesized by AI (for undo/styling)
+  aiMessageId?: string;      // Link to the AI message that generated this
 }
 
 export type Tool = 'draw' | 'select' | 'pan' | 'zoom';
@@ -135,6 +139,10 @@ export interface CanvasActions {
   addTextOverlay: (overlay: TextOverlay) => void;
   removeTextOverlay: (id: string) => void;
   clearTextOverlays: () => void;
+
+  // AI Handwriting actions (V2)
+  addAIStrokes: (strokes: Stroke[], messageId: string) => void;
+  undoLastAIResponse: () => void;
 
   // Typography & Training actions
   toggleTypographyGuides: () => void;

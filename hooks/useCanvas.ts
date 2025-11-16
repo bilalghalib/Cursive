@@ -198,6 +198,47 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       setTextOverlays([]);
     }, []),
 
+    // AI Handwriting actions (V2)
+    addAIStrokes: useCallback((strokes: Stroke[], messageId: string) => {
+      // Mark all strokes with AI metadata
+      const markedStrokes = strokes.map(stroke => ({
+        ...stroke,
+        isAIGenerated: true,
+        aiMessageId: messageId
+      }));
+
+      setDrawings(prev => {
+        const newDrawings = [...prev, ...markedStrokes];
+        // Add to undo stack
+        setUndoStack(prevStack => [...prevStack, newDrawings]);
+        // Clear redo stack
+        setRedoStack([]);
+        return newDrawings;
+      });
+
+      console.log(`[Canvas] Added ${strokes.length} AI-generated strokes`);
+    }, []),
+
+    undoLastAIResponse: useCallback(() => {
+      // Find the last AI message ID
+      const aiStrokes = drawings.filter(s => s.isAIGenerated);
+      if (aiStrokes.length === 0) return;
+
+      const lastAIMessageId = aiStrokes[aiStrokes.length - 1].aiMessageId;
+
+      // Remove all strokes with that message ID
+      setDrawings(prev => {
+        const newDrawings = prev.filter(s => s.aiMessageId !== lastAIMessageId);
+        // Add to undo stack
+        setUndoStack(prevStack => [...prevStack, newDrawings]);
+        // Clear redo stack
+        setRedoStack([]);
+        return newDrawings;
+      });
+
+      console.log(`[Canvas] Removed AI response: ${lastAIMessageId}`);
+    }, [drawings]),
+
     // Typography & Training actions
     toggleTypographyGuides: useCallback(() => {
       setTypographyGuides(prev => ({ ...prev, enabled: !prev.enabled }));

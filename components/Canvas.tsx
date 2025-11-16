@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getStroke } from 'perfect-freehand';
 import type { CanvasState, CanvasActions, Stroke, ChatMessage, TextOverlay } from '@/lib/types';
-import { sendImageToAI, imageDataToBase64, sendChatToAI } from '@/lib/ai';
+import { sendImageToAI, imageDataToBase64, sendChatToAIWithStyle } from '@/lib/ai';
+import { synthesizeHandwriting, hasTrainingData } from '@/lib/handwritingSynthesis';
+import { calculateSmartPosition, getMultiStrokeBounds } from '@/lib/canvasPositioning';
 
 interface CanvasProps {
   state: CanvasState;
@@ -12,6 +14,10 @@ interface CanvasProps {
 }
 
 export function Canvas({ state, actions, canvasRef }: CanvasProps) {
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [synthesisProgress, setSynthesisProgress] = useState(0);
+  const [currentWord, setCurrentWord] = useState('');
+
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -351,38 +357,121 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
             };
             actions.addChatMessage(userMessage);
 
-            // Step 3: Get AI response
+            // Step 3: Get AI response with style metadata
             const aiMessages = [...state.chatHistory, userMessage].map(msg => ({
               role: msg.role,
               content: msg.content
             }));
 
-            const aiResponse = await sendChatToAI(aiMessages);
+            const { text: aiResponse, style: styleMetadata } = await sendChatToAIWithStyle(aiMessages);
 
             // Step 4: Add AI message to chat history
             const aiMessage: ChatMessage = {
               id: (Date.now() + 1).toString(),
               role: 'assistant',
               content: aiResponse,
-              timestamp: Date.now() + 1
+              timestamp: Date.now() + 1,
+              styleMetadata
             };
             actions.addChatMessage(aiMessage);
 
-            // Step 5: Display AI response as text overlay on canvas
-            // Find a good position (below the selection, or at top if needed)
-            const selectionY = state.selectionRect ? Math.max(state.selectionRect.startY, state.selectionRect.endY) : 100;
+            // Step 5: Synthesize AI response in user's handwriting
+            const hasTrainedData = hasTrainingData();
 
-            const overlay: TextOverlay = {
-              id: aiMessage.id,
-              text: aiResponse,
-              x: 50,
-              y: selectionY + 50,
-              width: canvas.width - 100,
-              fontSize: 24,
-              color: '#4338ca', // indigo-700 for AI responses
-              timestamp: Date.now()
-            };
-            actions.addTextOverlay(overlay);
+            if (hasTrainedData) {
+              try {
+                setIsSynthesizing(true);
+
+                // Calculate smart position for AI response
+                const selectionBounds = state.selectionRect ? {
+                  minX: Math.min(state.selectionRect.startX, state.selectionRect.endX),
+                  minY: Math.min(state.selectionRect.startY, state.selectionRect.endY),
+                  maxX: Math.max(state.selectionRect.startX, state.selectionRect.endX),
+                  maxY: Math.max(state.selectionRect.startY, state.selectionRect.endY),
+                  width: Math.abs(state.selectionRect.endX - state.selectionRect.startX),
+                  height: Math.abs(state.selectionRect.endY - state.selectionRect.startY),
+                  centerX: (state.selectionRect.startX + state.selectionRect.endX) / 2,
+                  centerY: (state.selectionRect.startY + state.selectionRect.endY) / 2
+                } : null;
+
+                const lastAIStrokes = state.drawings.filter(s => s.isAIGenerated);
+                const lastAIBounds = lastAIStrokes.length > 0 ? getMultiStrokeBounds(lastAIStrokes) : null;
+
+                const position = calculateSmartPosition(
+                  state.drawings,
+                  selectionBounds,
+                  lastAIBounds,
+                  canvas.width,
+                  canvas.height,
+                  40 // Margin
+                );
+
+                console.log(`[Canvas] Synthesizing AI response at (${position.x}, ${position.y})`);
+                console.log(`[Canvas] Style metadata:`, styleMetadata);
+
+                // Synthesize handwriting
+                const result = await synthesizeHandwriting(aiResponse, {
+                  startX: position.x,
+                  startY: position.y,
+                  maxWidth: canvas.width - position.x - 50,
+                  lineHeight: 60,
+                  wordSpacing: 20,
+                  letterSpacing: 5,
+                  scaleFactor: 0.75, // Scale down from training size
+                  color: '#4338ca', // Blue for AI
+                  styleMetadata,
+                  onProgress: (progress, word) => {
+                    setSynthesisProgress(progress);
+                    setCurrentWord(word);
+                  }
+                });
+
+                // Add synthesized strokes to canvas
+                actions.addAIStrokes(result.strokes, aiMessage.id);
+
+                // Show warnings if any
+                if (result.warnings.length > 0) {
+                  console.warn('[Canvas] Synthesis warnings:', result.warnings);
+                }
+
+                console.log(`[Canvas] Synthesis complete: ${result.stats.synthesizedChars} chars, ${result.stats.fallbackChars} fallbacks`);
+
+              } catch (error) {
+                console.error('[Canvas] Handwriting synthesis failed:', error);
+                // Fallback to text overlay
+                const selectionY = state.selectionRect ? Math.max(state.selectionRect.startY, state.selectionRect.endY) : 100;
+                const overlay: TextOverlay = {
+                  id: aiMessage.id,
+                  text: aiResponse,
+                  x: 50,
+                  y: selectionY + 50,
+                  width: canvas.width - 100,
+                  fontSize: 24,
+                  color: '#4338ca',
+                  timestamp: Date.now()
+                };
+                actions.addTextOverlay(overlay);
+              } finally {
+                setIsSynthesizing(false);
+                setSynthesisProgress(0);
+                setCurrentWord('');
+              }
+            } else {
+              // No training data - use text overlay
+              console.warn('[Canvas] No training data found, using text overlay');
+              const selectionY = state.selectionRect ? Math.max(state.selectionRect.startY, state.selectionRect.endY) : 100;
+              const overlay: TextOverlay = {
+                id: aiMessage.id,
+                text: aiResponse,
+                x: 50,
+                y: selectionY + 50,
+                width: canvas.width - 100,
+                fontSize: 24,
+                color: '#4338ca',
+                timestamp: Date.now()
+              };
+              actions.addTextOverlay(overlay);
+            }
 
             // Clear selection rectangle
             actions.clearSelection();
@@ -490,6 +579,22 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
           </div>
         )}
       </div>
+
+      {/* Synthesis progress indicator */}
+      {isSynthesizing && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            <div>
+              <div className="font-medium">Claude is writing...</div>
+              <div className="text-sm opacity-90">
+                {currentWord && <span className="italic">{currentWord}</span>}
+                {synthesisProgress > 0 && <span className="ml-2">({Math.round(synthesisProgress)}%)</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
