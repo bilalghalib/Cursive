@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import type { CanvasState, CanvasActions, Tool } from '@/lib/types';
+import { UserMenu } from './UserMenu';
+import { AuthModal } from './AuthModal';
 
 interface ToolbarProps {
   state: CanvasState;
@@ -15,6 +17,7 @@ interface ToolbarProps {
 export function Toolbar({ state, actions, onExportJSON, onExportPDF, onImportJSON, onToggleTheme }: ToolbarProps) {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const tools = [
     { id: 'draw' as Tool, icon: 'fa-pencil-alt', label: 'Draw' },
@@ -121,7 +124,7 @@ export function Toolbar({ state, actions, onExportJSON, onExportPDF, onImportJSO
             title="New Session"
           >
             <i className="fas fa-file mr-1" />
-            <span className="text-sm">New</span>
+            <span className="text-sm hidden sm:inline">New</span>
           </button>
 
           <button
@@ -214,6 +217,9 @@ export function Toolbar({ state, actions, onExportJSON, onExportPDF, onImportJSO
               </>
             )}
           </div>
+
+          {/* User menu */}
+          <UserMenu onLoginClick={() => setShowAuthModal(true)} />
         </div>
       </div>
 
@@ -242,6 +248,16 @@ export function Toolbar({ state, actions, onExportJSON, onExportPDF, onImportJSO
           </div>
         </div>
       )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          // Refresh user menu
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }

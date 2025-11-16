@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { getStroke } from 'perfect-freehand';
 import type { CanvasState, CanvasActions, Stroke, ChatMessage, TextOverlay } from '@/lib/types';
 import { sendImageToAI, imageDataToBase64, sendChatToAI } from '@/lib/ai';
 
@@ -48,7 +49,7 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
   // Redraw canvas whenever state changes
   useEffect(() => {
     redrawCanvas();
-  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect, state.textOverlays]);
+  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect, state.textOverlays, state.typographyGuides]);
 
   const redrawCanvas = () => {
     const canvas = canvasRef.current;
@@ -68,6 +69,11 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     ctx.save();
     ctx.translate(state.panX, state.panY);
     ctx.scale(state.scale, state.scale);
+
+    // Draw typography guides (if enabled)
+    if (state.typographyGuides.enabled) {
+      drawTypographyGuides(ctx);
+    }
 
     // Draw all strokes
     state.drawings.forEach(stroke => {
@@ -99,19 +105,40 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
   const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
     if (stroke.points.length === 0) return;
 
+    // Convert points to perfect-freehand format: [x, y, pressure]
+    const inputPoints = stroke.points.map(p => [
+      p.x,
+      p.y,
+      p.pressure || 0.5 // Default pressure if not available
+    ]);
+
+    // Use perfect-freehand to generate smooth outline
+    const outlinePoints = getStroke(inputPoints, {
+      size: stroke.width * 4,        // Base size (multiply by 4 for good thickness)
+      thinning: 0.5,                  // Pressure sensitivity
+      smoothing: 0.5,                 // Curve smoothing
+      streamline: 0.5,                // Point reduction for smoothness
+      easing: (t) => t,               // Linear pressure easing
+      start: { taper: 0, cap: true }, // Round start cap
+      end: { taper: 0, cap: true }    // Round end cap
+    });
+
+    // Render the stroke as a filled polygon
+    if (outlinePoints.length === 0) return;
+
     ctx.beginPath();
-    ctx.strokeStyle = stroke.color;
-    ctx.lineWidth = stroke.width;
+    ctx.fillStyle = stroke.color;
 
-    const firstPoint = stroke.points[0];
-    ctx.moveTo(firstPoint.x, firstPoint.y);
+    // Move to first point
+    ctx.moveTo(outlinePoints[0][0], outlinePoints[0][1]);
 
-    for (let i = 1; i < stroke.points.length; i++) {
-      const point = stroke.points[i];
-      ctx.lineTo(point.x, point.y);
+    // Draw outline polygon
+    for (let i = 1; i < outlinePoints.length; i++) {
+      ctx.lineTo(outlinePoints[i][0], outlinePoints[i][1]);
     }
 
-    ctx.stroke();
+    ctx.closePath();
+    ctx.fill();
   };
 
   const drawTextOverlay = (ctx: CanvasRenderingContext2D, overlay: TextOverlay) => {
@@ -141,6 +168,55 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       }
     }
     ctx.fillText(currentLine, overlay.x, y);
+
+    ctx.restore();
+  };
+
+  const drawTypographyGuides = (ctx: CanvasRenderingContext2D) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const guides = state.typographyGuides;
+    const canvasWidth = canvas.width / state.scale;
+
+    ctx.save();
+    ctx.strokeStyle = guides.color;
+    ctx.globalAlpha = guides.opacity;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+
+    // Draw horizontal guide lines
+    const lines = [
+      { y: guides.baseline - guides.ascender, label: 'Ascender' },
+      { y: guides.baseline - guides.capHeight, label: 'Cap Height' },
+      { y: guides.baseline - guides.xHeight, label: 'X-Height' },
+      { y: guides.baseline, label: 'Baseline', bold: true },
+      { y: guides.baseline + guides.descender, label: 'Descender' },
+    ];
+
+    lines.forEach(line => {
+      ctx.beginPath();
+      ctx.moveTo(0, line.y);
+      ctx.lineTo(canvasWidth, line.y);
+      ctx.stroke();
+
+      // Draw label
+      if (line.bold) {
+        ctx.setLineDash([]);
+        ctx.lineWidth = 2;
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = guides.color;
+      ctx.font = '12px sans-serif';
+      ctx.fillText(line.label, 10, line.y - 5);
+      ctx.globalAlpha = guides.opacity;
+
+      if (line.bold) {
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 1;
+      }
+    });
 
     ctx.restore();
   };
