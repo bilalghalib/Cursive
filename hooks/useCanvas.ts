@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import type { Tool, Point, Stroke, SelectionRect, CanvasState, CanvasActions } from '@/lib/types';
+import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions } from '@/lib/types';
 
 export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCanvasElement>] {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -20,6 +20,10 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
 
   // Selection state
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
+
+  // Chat/Conversation state
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
 
   // History
   const [undoStack, setUndoStack] = useState<Stroke[][]>([[]]);
@@ -142,6 +146,23 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       setScale(newScale);
     }, [scale]),
 
+    // Chat/Conversation actions
+    addChatMessage: useCallback((message: ChatMessage) => {
+      setChatHistory(prev => [...prev, message]);
+    }, []),
+
+    addTextOverlay: useCallback((overlay: TextOverlay) => {
+      setTextOverlays(prev => [...prev, overlay]);
+    }, []),
+
+    removeTextOverlay: useCallback((id: string) => {
+      setTextOverlays(prev => prev.filter(overlay => overlay.id !== id));
+    }, []),
+
+    clearTextOverlays: useCallback(() => {
+      setTextOverlays([]);
+    }, []),
+
     // History actions
     undo: useCallback(() => {
       if (undoStack.length > 1) {
@@ -173,6 +194,8 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       setUndoStack([[]]);
       setRedoStack([]);
       setSelectionRect(null);
+      setChatHistory([]);
+      setTextOverlays([]);
       setScale(1);
       setPanX(0);
       setPanY(0);
@@ -194,6 +217,8 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
     panX,
     panY,
     selectionRect,
+    chatHistory,
+    textOverlays,
     undoStack,
     redoStack
   };

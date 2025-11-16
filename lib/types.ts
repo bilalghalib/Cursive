@@ -22,6 +22,18 @@ export interface SelectionRect {
   endY: number;
 }
 
+// Text overlay (for AI responses on canvas)
+export interface TextOverlay {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  color: string;
+  timestamp: number;
+}
+
 export interface CanvasState {
   // Tool state
   currentTool: Tool;
@@ -37,6 +49,10 @@ export interface CanvasState {
 
   // Selection state
   selectionRect: SelectionRect | null;
+
+  // Chat/Conversation state
+  chatHistory: ChatMessage[];
+  textOverlays: TextOverlay[];
 
   // History
   undoStack: Stroke[][];
@@ -65,6 +81,12 @@ export interface CanvasActions {
 
   // Zoom actions
   zoom: (delta: number, centerX: number, centerY: number) => void;
+
+  // Chat/Conversation actions
+  addChatMessage: (message: ChatMessage) => void;
+  addTextOverlay: (overlay: TextOverlay) => void;
+  removeTextOverlay: (id: string) => void;
+  clearTextOverlays: () => void;
 
   // History actions
   undo: () => void;

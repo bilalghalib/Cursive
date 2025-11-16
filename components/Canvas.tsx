@@ -1,17 +1,16 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { CanvasState, CanvasActions, Stroke, TranscriptionResult } from '@/lib/types';
-import { sendImageToAI, imageDataToBase64 } from '@/lib/ai';
+import type { CanvasState, CanvasActions, Stroke, ChatMessage, TextOverlay } from '@/lib/types';
+import { sendImageToAI, imageDataToBase64, sendChatToAI } from '@/lib/ai';
 
 interface CanvasProps {
   state: CanvasState;
   actions: CanvasActions;
   canvasRef: React.RefObject<HTMLCanvasElement>;
-  onSelectionComplete?: (imageData: ImageData | null, transcription?: TranscriptionResult) => void;
 }
 
-export function Canvas({ state, actions, canvasRef, onSelectionComplete }: CanvasProps) {
+export function Canvas({ state, actions, canvasRef }: CanvasProps) {
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -49,7 +48,7 @@ export function Canvas({ state, actions, canvasRef, onSelectionComplete }: Canva
   // Redraw canvas whenever state changes
   useEffect(() => {
     redrawCanvas();
-  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect]);
+  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect, state.textOverlays]);
 
   const redrawCanvas = () => {
     const canvas = canvasRef.current;
@@ -84,6 +83,11 @@ export function Canvas({ state, actions, canvasRef, onSelectionComplete }: Canva
       });
     }
 
+    // Draw text overlays
+    state.textOverlays.forEach(overlay => {
+      drawTextOverlay(ctx, overlay);
+    });
+
     ctx.restore();
 
     // Draw selection rectangle (after restoring transform, so it's not affected by pan/zoom)
@@ -108,6 +112,37 @@ export function Canvas({ state, actions, canvasRef, onSelectionComplete }: Canva
     }
 
     ctx.stroke();
+  };
+
+  const drawTextOverlay = (ctx: CanvasRenderingContext2D, overlay: TextOverlay) => {
+    ctx.save();
+
+    // Set font and text properties
+    ctx.font = `${overlay.fontSize}px 'Caveat', cursive`;
+    ctx.fillStyle = overlay.color;
+    ctx.textBaseline = 'top';
+
+    // Word wrap the text
+    const words = overlay.text.split(' ');
+    const lineHeight = overlay.fontSize * 1.4;
+    let currentLine = '';
+    let y = overlay.y;
+
+    for (let i = 0; i < words.length; i++) {
+      const testLine = currentLine + words[i] + ' ';
+      const metrics = ctx.measureText(testLine);
+
+      if (metrics.width > overlay.width && i > 0) {
+        ctx.fillText(currentLine, overlay.x, y);
+        currentLine = words[i] + ' ';
+        y += lineHeight;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    ctx.fillText(currentLine, overlay.x, y);
+
+    ctx.restore();
   };
 
   const drawSelectionRect = (ctx: CanvasRenderingContext2D, rect: { startX: number; startY: number; endX: number; endY: number }) => {
@@ -222,25 +257,62 @@ export function Canvas({ state, actions, canvasRef, onSelectionComplete }: Canva
         break;
       }
       case 'select': {
-        // Selection finished - trigger AI transcription
+        // Selection finished - trigger AI conversation flow
         const imageData = actions.finishSelection();
-        if (imageData && onSelectionComplete) {
+        if (imageData) {
           try {
-            // Convert ImageData to base64
+            // Step 1: Transcribe handwriting
             const base64Image = imageDataToBase64(imageData);
-
-            // Send to AI for transcription
             const transcription = await sendImageToAI(base64Image);
 
-            // Trigger callback with both imageData and transcription
-            onSelectionComplete(imageData, transcription);
+            // Step 2: Add user message to chat history
+            const userMessage: ChatMessage = {
+              id: Date.now().toString(),
+              role: 'user',
+              content: transcription.transcription,
+              timestamp: Date.now(),
+              isHandwritten: true
+            };
+            actions.addChatMessage(userMessage);
+
+            // Step 3: Get AI response
+            const aiMessages = [...state.chatHistory, userMessage].map(msg => ({
+              role: msg.role,
+              content: msg.content
+            }));
+
+            const aiResponse = await sendChatToAI(aiMessages);
+
+            // Step 4: Add AI message to chat history
+            const aiMessage: ChatMessage = {
+              id: (Date.now() + 1).toString(),
+              role: 'assistant',
+              content: aiResponse,
+              timestamp: Date.now() + 1
+            };
+            actions.addChatMessage(aiMessage);
+
+            // Step 5: Display AI response as text overlay on canvas
+            // Find a good position (below the selection, or at top if needed)
+            const selectionY = state.selectionRect ? Math.max(state.selectionRect.startY, state.selectionRect.endY) : 100;
+
+            const overlay: TextOverlay = {
+              id: aiMessage.id,
+              text: aiResponse,
+              x: 50,
+              y: selectionY + 50,
+              width: canvas.width - 100,
+              fontSize: 24,
+              color: '#4338ca', // indigo-700 for AI responses
+              timestamp: Date.now()
+            };
+            actions.addTextOverlay(overlay);
 
             // Clear selection rectangle
             actions.clearSelection();
           } catch (error) {
-            console.error('Error transcribing selection:', error);
-            // Still open chat panel but without transcription
-            onSelectionComplete(imageData);
+            console.error('Error in AI conversation:', error);
+            alert('Failed to process selection. Please try again.');
           }
         }
         break;
@@ -336,6 +408,11 @@ export function Canvas({ state, actions, canvasRef, onSelectionComplete }: Canva
             <span className="ml-2">| Zoom: {Math.round(state.scale * 100)}%</span>
           )}
         </div>
+        {state.chatHistory.length > 0 && (
+          <div className="text-xs opacity-75 mt-1">
+            {state.chatHistory.length} messages
+          </div>
+        )}
       </div>
     </div>
   );
