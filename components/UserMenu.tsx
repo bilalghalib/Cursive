@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { User, LogOut, Settings } from 'lucide-react';
 import { getCurrentUser, signOut } from '@/lib/auth';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface UserMenuProps {
   onLoginClick: () => void;
 }
 
 export function UserMenu({ onLoginClick }: UserMenuProps) {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
