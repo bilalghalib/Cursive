@@ -1,39 +1,15 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import type { CanvasState, CanvasActions, Stroke } from '@/lib/types';
 
-interface Point {
-  x: number;
-  y: number;
+interface CanvasProps {
+  state: CanvasState;
+  actions: CanvasActions;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
 }
 
-interface Stroke {
-  points: Point[];
-  color: string;
-  width: number;
-}
-
-type Tool = 'draw' | 'select' | 'pan' | 'zoom';
-
-export function Canvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-
-  // Drawing state
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentTool, setCurrentTool] = useState<Tool>('draw');
-  const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
-  const [drawings, setDrawings] = useState<Stroke[]>([]);
-  
-  // Transform state
-  const [scale, setScale] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
-  
-  // Undo/redo
-  const [undoStack, setUndoStack] = useState<Stroke[][]>([[]]);
-  const [redoStack, setRedoStack] = useState<Stroke[][]>([]);
-
+export function Canvas({ state, actions, canvasRef }: CanvasProps) {
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -41,8 +17,6 @@ export function Canvas() {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    ctxRef.current = ctx;
 
     // Set canvas size
     const resizeCanvas = () => {
@@ -65,20 +39,22 @@ export function Canvas() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Fill background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     return () => {
       window.removeEventListener('resize', resizeCanvas);
     };
   }, []);
 
-  // Redraw canvas
+  // Redraw canvas whenever state changes
+  useEffect(() => {
+    redrawCanvas();
+  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect]);
+
   const redrawCanvas = () => {
     const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
-    if (!canvas || !ctx) return;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     // Clear canvas
     ctx.save();
@@ -89,30 +65,33 @@ export function Canvas() {
 
     // Apply transformations
     ctx.save();
-    ctx.translate(panX, panY);
-    ctx.scale(scale, scale);
+    ctx.translate(state.panX, state.panY);
+    ctx.scale(state.scale, state.scale);
 
     // Draw all strokes
-    drawings.forEach(stroke => {
-      drawStroke(stroke);
+    state.drawings.forEach(stroke => {
+      drawStroke(ctx, stroke);
     });
 
     // Draw current stroke
-    if (currentStroke.length > 0) {
-      drawStroke({
-        points: currentStroke,
+    if (state.currentStroke.length > 0) {
+      drawStroke(ctx, {
+        points: state.currentStroke,
         color: '#000000',
         width: 2
       });
     }
 
     ctx.restore();
+
+    // Draw selection rectangle (after restoring transform, so it's not affected by pan/zoom)
+    if (state.selectionRect) {
+      drawSelectionRect(ctx, state.selectionRect);
+    }
   };
 
-  // Draw a stroke
-  const drawStroke = (stroke: Stroke) => {
-    const ctx = ctxRef.current;
-    if (!ctx || stroke.points.length === 0) return;
+  const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
+    if (stroke.points.length === 0) return;
 
     ctx.beginPath();
     ctx.strokeStyle = stroke.color;
@@ -129,61 +108,196 @@ export function Canvas() {
     ctx.stroke();
   };
 
-  // Redraw when drawings change
-  useEffect(() => {
-    redrawCanvas();
-  }, [drawings, currentStroke, scale, panX, panY]);
+  const drawSelectionRect = (ctx: CanvasRenderingContext2D, rect: { startX: number; startY: number; endX: number; endY: number }) => {
+    const minX = Math.min(rect.startX, rect.endX);
+    const minY = Math.min(rect.startY, rect.endY);
+    const width = Math.abs(rect.endX - rect.startX);
+    const height = Math.abs(rect.endY - rect.startY);
+
+    // Draw dashed rectangle
+    ctx.save();
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = '#2563eb'; // blue-600
+    ctx.lineWidth = 2;
+    ctx.strokeRect(minX, minY, width, height);
+
+    // Draw semi-transparent fill
+    ctx.fillStyle = 'rgba(37, 99, 235, 0.1)';
+    ctx.fillRect(minX, minY, width, height);
+    ctx.restore();
+  };
+
+  // Get canvas coordinates from event
+  const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left - state.panX) / state.scale;
+    const y = (e.clientY - rect.top - state.panY) / state.scale;
+
+    return { x, y };
+  };
+
+  const getScreenCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  };
 
   // Pointer event handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - panX) / scale;
-    const y = (e.clientY - rect.top - panY) / scale;
+    // Capture pointer for smooth tracking
+    canvas.setPointerCapture(e.pointerId);
 
-    if (currentTool === 'draw') {
-      setIsDrawing(true);
-      setCurrentStroke([{ x, y }]);
+    switch (state.currentTool) {
+      case 'draw': {
+        const { x, y } = getCanvasCoords(e);
+        actions.startDrawing({ x, y });
+        break;
+      }
+      case 'select': {
+        const { x, y } = getScreenCoords(e);
+        actions.startSelection(x, y);
+        break;
+      }
+      case 'pan': {
+        const { x, y } = getScreenCoords(e);
+        actions.startPan(x, y);
+        // Change cursor
+        canvas.style.cursor = 'grabbing';
+        break;
+      }
+      // Zoom mode doesn't use pointer down
     }
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || currentTool !== 'draw') return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - panX) / scale;
-    const y = (e.clientY - rect.top - panY) / scale;
-
-    setCurrentStroke(prev => [...prev, { x, y }]);
-  };
-
-  const handlePointerUp = () => {
-    if (isDrawing && currentStroke.length > 0) {
-      // Save stroke to drawings
-      const newStroke: Stroke = {
-        points: currentStroke,
-        color: '#000000',
-        width: 2
-      };
-
-      setDrawings(prev => {
-        const newDrawings = [...prev, newStroke];
-        // Update undo stack
-        setUndoStack(stack => [...stack, newDrawings]);
-        setRedoStack([]);
-        return newDrawings;
-      });
-
-      setCurrentStroke([]);
+    switch (state.currentTool) {
+      case 'draw': {
+        if (state.currentStroke.length > 0) {
+          const { x, y } = getCanvasCoords(e);
+          actions.continueDrawing({ x, y });
+        }
+        break;
+      }
+      case 'select': {
+        if (state.selectionRect) {
+          const { x, y } = getScreenCoords(e);
+          actions.updateSelection(x, y);
+        }
+        break;
+      }
+      case 'pan': {
+        const { x, y } = getScreenCoords(e);
+        actions.updatePan(x, y);
+        break;
+      }
     }
-
-    setIsDrawing(false);
   };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Release pointer capture
+    canvas.releasePointerCapture(e.pointerId);
+
+    switch (state.currentTool) {
+      case 'draw': {
+        actions.finishDrawing();
+        break;
+      }
+      case 'select': {
+        // Selection finished - could trigger AI transcription here
+        const imageData = actions.finishSelection();
+        if (imageData) {
+          // TODO: Send to AI for transcription
+          console.log('Selection captured:', imageData);
+        }
+        break;
+      }
+      case 'pan': {
+        actions.finishPan();
+        canvas.style.cursor = 'grab';
+        break;
+      }
+    }
+  };
+
+  // Mouse wheel for zoom
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    if (state.currentTool === 'zoom') {
+      e.preventDefault();
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left - state.panX) / state.scale;
+      const y = (e.clientY - rect.top - state.panY) / state.scale;
+
+      actions.zoom(-e.deltaY, x, y);
+    }
+  };
+
+  // Update cursor based on tool
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    switch (state.currentTool) {
+      case 'draw':
+        canvas.style.cursor = 'crosshair';
+        break;
+      case 'select':
+        canvas.style.cursor = 'crosshair';
+        break;
+      case 'pan':
+        canvas.style.cursor = 'grab';
+        break;
+      case 'zoom':
+        canvas.style.cursor = 'zoom-in';
+        break;
+    }
+  }, [state.currentTool]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape to clear selection
+      if (e.key === 'Escape' && state.selectionRect) {
+        actions.clearSelection();
+      }
+
+      // Ctrl/Cmd + Z for undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        actions.undo();
+      }
+
+      // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y for redo
+      if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
+          ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+        e.preventDefault();
+        actions.redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state.selectionRect, actions]);
 
   return (
     <div className="relative w-full h-full bg-white">
@@ -194,7 +308,18 @@ export function Canvas() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerOut={handlePointerUp}
+        onWheel={handleWheel}
       />
+
+      {/* Tool indicator */}
+      <div className="absolute bottom-4 right-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded-md text-sm">
+        <div className="flex items-center gap-2">
+          <span>Tool: <strong>{state.currentTool}</strong></span>
+          {state.currentTool === 'zoom' && (
+            <span className="ml-2">| Zoom: {Math.round(state.scale * 100)}%</span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
