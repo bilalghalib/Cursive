@@ -66,6 +66,9 @@ export interface HandwritingOptions {
   baselineVariation?: number;
   characterVariation?: number;
   consistentStyle?: boolean;
+  // Mood-based parameters (from Living Fonts)
+  messiness?: number;  // 0-1, affects baseline variation and jitter
+  speed?: number;      // multiplier for spacing
 }
 
 /**
@@ -119,24 +122,59 @@ export const handwritingStyles = {
 };
 
 /**
+ * Convert mood-based parameters to handwriting options
+ */
+export function moodToHandwritingOptions(
+  slant: number,
+  spacing: number,
+  messiness: number,
+  speed: number
+): Partial<HandwritingOptions> {
+  return {
+    slant: slant / 60,  // Convert degrees to decimal (e.g., 8° → 0.133)
+    letterSpacing: 8 * spacing,
+    wordSpacing: 15 * spacing,
+    jitter: messiness * 0.4,  // messiness affects jitter
+    baselineVariation: messiness * 4,  // messiness affects baseline
+    characterVariation: messiness * 0.5,  // messiness affects character variation
+    speed: speed
+  };
+}
+
+/**
  * Creates a realistic handwriting simulation SVG
  */
 export function simulateHandwriting(text: string, width: number, options: HandwritingOptions = {}): string {
+  // Apply mood-based parameters if messiness/speed provided
+  let adjustedOptions = { ...options };
+  if (options.messiness !== undefined || options.speed !== undefined) {
+    const messiness = options.messiness ?? 0.3;
+    const speed = options.speed ?? 1.0;
+    adjustedOptions = {
+      ...options,
+      jitter: options.jitter ?? messiness * 0.4,
+      baselineVariation: options.baselineVariation ?? messiness * 4,
+      characterVariation: options.characterVariation ?? messiness * 0.5,
+      letterSpacing: options.letterSpacing ?? 8 * speed,
+      wordSpacing: options.wordSpacing ?? 15 * speed
+    };
+  }
+
   // Default options
   const settings = {
-    fontSize: options.fontSize || 20,
-    lineHeight: options.lineHeight || 30,
-    letterSpacing: options.letterSpacing || 8,
-    wordSpacing: options.wordSpacing || 15,
-    color: options.color || '#000000',
-    slant: options.slant || 0.1,
-    connectLetters: options.connectLetters !== undefined ? options.connectLetters : true,
-    jitter: options.jitter !== undefined ? options.jitter : 0.15,
-    thickness: options.thickness || 1.5,
-    thicknessVariation: options.thicknessVariation || 0.3,
-    baselineVariation: options.baselineVariation || 1.5,
-    characterVariation: options.characterVariation || 0.2,
-    consistentStyle: options.consistentStyle !== undefined ? options.consistentStyle : true
+    fontSize: adjustedOptions.fontSize || 20,
+    lineHeight: adjustedOptions.lineHeight || 30,
+    letterSpacing: adjustedOptions.letterSpacing || 8,
+    wordSpacing: adjustedOptions.wordSpacing || 15,
+    color: adjustedOptions.color || '#000000',
+    slant: adjustedOptions.slant || 0.1,
+    connectLetters: adjustedOptions.connectLetters !== undefined ? adjustedOptions.connectLetters : true,
+    jitter: adjustedOptions.jitter !== undefined ? adjustedOptions.jitter : 0.15,
+    thickness: adjustedOptions.thickness || 1.5,
+    thicknessVariation: adjustedOptions.thicknessVariation || 0.3,
+    baselineVariation: adjustedOptions.baselineVariation || 1.5,
+    characterVariation: adjustedOptions.characterVariation || 0.2,
+    consistentStyle: adjustedOptions.consistentStyle !== undefined ? adjustedOptions.consistentStyle : true
   };
 
   // Create SVG element
