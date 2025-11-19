@@ -4,72 +4,40 @@
 
 ---
 
-## 🚀 Quick Start (5 minutes)
+## 🚀 Quick Start (2 minutes)
 
-### 1. Get Your Computer's IP Address
-
-**On Mac:**
-```bash
-ipconfig getifaddr en0
-# Example output: 192.168.1.42
-```
-
-**On Linux:**
-```bash
-hostname -I | awk '{print $1}'
-# Example output: 10.0.0.15
-```
-
-**On Windows (PowerShell):**
-```powershell
-(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlias -notlike "*Loopback*"}).IPAddress
-```
-
-**On Windows (Command Prompt):**
-```cmd
-ipconfig
-# Look for "IPv4 Address" - usually starts with 192.168 or 10.0
-```
-
-### 2. Start Dev Server (On Your Computer)
+### 1. Start Dev Server (On Your Computer)
 
 ```bash
 cd ~/Cursive
 npm run dev
 ```
 
-You should see:
+Next.js will automatically show your network IP:
 ```
-✓ Ready on http://0.0.0.0:3000
+▲ Next.js 15.0.3
+- Local:        http://localhost:3000
+- Network:      http://192.168.1.42:3000  ← Use this on iPad!
 ```
 
-### 3. Connect from iPad
+### 2. Connect from iPad (Same WiFi!)
 
 **On your iPad:**
-1. Open Safari (or Chrome)
-2. Navigate to: `http://YOUR_COMPUTER_IP:3000`
-   - Example: `http://192.168.1.42:3000`
-3. You should see the Cursive app!
+1. Open **Safari** (best Apple Pencil support)
+2. Navigate to the **Network URL** from step 1
+   - Example: `http://192.168.1.42:3000/train`
+3. Password: `cursive-dev-2024`
 
 **Troubleshooting:**
 - ❌ "Can't connect" → Make sure iPad and computer are on **same WiFi network**
-- ❌ Firewall blocking → Temporarily disable firewall or allow port 3000
-- ❌ Wrong IP → Try all IP addresses from step 1
+- ❌ Firewall blocking → Allow port 3000 in firewall settings
+- ❌ Can't find IP → Look for the "Network:" line in `npm run dev` output
 
 ---
 
 ## ✍️ Training Flow on iPad
 
-### 1. Navigate to Training Page
-
-**In Safari on iPad:**
-```
-http://YOUR_IP:3000/train
-```
-
-**Password:** `cursive-dev-2024`
-
-### 2. Training UI Features (Optimized for iPad)
+### Training UI Features (Optimized for iPad)
 
 You'll see:
 - ✍️ Large drawing area (full screen)
@@ -78,7 +46,7 @@ You'll see:
 - 🎨 Palm rejection (automatic)
 - ⚡ Pressure sensitivity (Apple Pencil)
 
-### 3. Phase 1: Neutral Baseline (8 min)
+### Phase 1: Neutral Baseline (8 min)
 
 **What to do:**
 1. Sit normally, relaxed state
@@ -94,7 +62,7 @@ You'll see:
 - ✅ Write at comfortable speed
 - ✅ If you mess up, just write it again
 
-### 4. Phase 2: Emotional States (20-30 min)
+### Phase 2: Emotional States (20-30 min)
 
 **CRITICAL:** Actually FEEL the emotion!
 
@@ -152,7 +120,7 @@ Your handwriting will naturally:
 - Less controlled
 - Maybe wobblier baseline
 
-### 5. Phase 3: Cursive Connections (Optional, 10 min)
+### Phase 3: Cursive Connections (Optional, 10 min)
 
 If you write in cursive, train common letter pairs:
 - th, he, in, er, an, re, on, at, en, nd, ti, es, or, te, of, ed, is, it, al, ar
