@@ -116,6 +116,26 @@ export function Toolbar({ state, actions, onExportJSON, onExportPDF, onImportJSO
           </button>
         </div>
 
+        {/* Educational integrity toggle */}
+        <div className="flex gap-1 border-r border-gray-200 pr-2 mr-2">
+          <button
+            onClick={actions.toggleHideAIResponses}
+            className={`
+              px-3 py-2 rounded-md transition-colors
+              ${state.hideAIResponses
+                ? 'bg-indigo-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }
+            `}
+            title={state.hideAIResponses ? "Show AI Responses" : "Hide AI Responses (Student Mode)"}
+          >
+            <i className={`fas ${state.hideAIResponses ? 'fa-eye-slash' : 'fa-robot'}`} />
+            <span className="text-sm ml-1 hidden sm:inline">
+              {state.hideAIResponses ? 'Student Mode' : 'Full View'}
+            </span>
+          </button>
+        </div>
+
         {/* Utility buttons */}
         <div className="flex gap-1 ml-auto">
           <button
