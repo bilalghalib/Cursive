@@ -191,57 +191,35 @@ export class MoodStreamParser {
 }
 
 /**
- * Map mood to handwriting style parameters
+ * TEMPORARY: Map mood to handwriting style parameters
+ *
+ * NOTE: This is a PLACEHOLDER for demonstration purposes only!
+ *
+ * The actual emotional variation should come from the trained LSTM model,
+ * which learns how YOUR handwriting changes with emotion from training data.
+ *
+ * These preset values will be REPLACED with LSTM-generated strokes once you:
+ * 1. Complete handwriting training (collecting samples in different emotional states)
+ * 2. Train the LSTM model (python train_lstm.py)
+ * 3. Integrate ONNX.js browser inference
+ *
+ * Current status: Using algorithmic approximation (not authentic)
+ * Future status: Using trained neural network (authentic emotional variation)
  */
-export function getMoodStyleParams(mood: MoodName, intensity: number) {
+export function getMoodStyleParams_TEMPORARY_PLACEHOLDER(mood: MoodName, intensity: number) {
+  // WARNING: These are arbitrary preset values, NOT learned from your handwriting!
   const baseStyles = {
-    excited: {
-      slant: 8,
-      spacing: 1.2,
-      messiness: 0.5,
-      speed: 1.3
-    },
-    thoughtful: {
-      slant: 3,
-      spacing: 0.95,
-      messiness: 0.3,
-      speed: 0.8
-    },
-    calm: {
-      slant: 2,
-      spacing: 1.0,
-      messiness: 0.2,
-      speed: 0.85
-    },
-    urgent: {
-      slant: 10,
-      spacing: 1.3,
-      messiness: 0.6,
-      speed: 1.5
-    },
-    formal: {
-      slant: 0,
-      spacing: 1.05,
-      messiness: 0.1,
-      speed: 0.9
-    },
-    empathetic: {
-      slant: 4,
-      spacing: 1.0,
-      messiness: 0.25,
-      speed: 0.85
-    },
-    neutral: {
-      slant: 5,
-      spacing: 1.0,
-      messiness: 0.3,
-      speed: 1.0
-    }
+    excited: { slant: 8, spacing: 1.2, messiness: 0.5, speed: 1.3 },
+    thoughtful: { slant: 3, spacing: 0.95, messiness: 0.3, speed: 0.8 },
+    calm: { slant: 2, spacing: 1.0, messiness: 0.2, speed: 0.85 },
+    urgent: { slant: 10, spacing: 1.3, messiness: 0.6, speed: 1.5 },
+    formal: { slant: 0, spacing: 1.05, messiness: 0.1, speed: 0.9 },
+    empathetic: { slant: 4, spacing: 1.0, messiness: 0.25, speed: 0.85 },
+    neutral: { slant: 5, spacing: 1.0, messiness: 0.3, speed: 1.0 }
   };
 
   const base = baseStyles[mood];
 
-  // Apply intensity scaling
   return {
     slant: base.slant * intensity,
     spacing: 1.0 + (base.spacing - 1.0) * intensity,

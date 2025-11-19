@@ -34,6 +34,10 @@ class HandwritingSample:
         self.points = points  # [{'x': float, 'y': float, 'pressure': float, 't': int}]
         self.metadata = metadata or {}
 
+        # Extract emotional state from metadata
+        self.emotional_state = metadata.get('emotional_state', 'neutral')
+        self.intensity = metadata.get('intensity', 0.5)
+
     def to_sequence(self) -> np.ndarray:
         """Convert points to sequence of (dx, dy, pressure, pen_up) deltas"""
         sequence = []
@@ -80,6 +84,10 @@ class HandwritingSample:
 class HandwritingDataset(Dataset):
     """PyTorch dataset for handwriting samples"""
 
+    # Emotion mapping
+    EMOTIONS = ['neutral', 'excited', 'thoughtful', 'calm', 'urgent', 'formal', 'empathetic']
+    EMOTION_TO_IDX = {emotion: idx for idx, emotion in enumerate(EMOTIONS)}
+
     def __init__(self, samples: List[HandwritingSample], char_to_idx: Dict[str, int]):
         self.samples = samples
         self.char_to_idx = char_to_idx
@@ -94,6 +102,12 @@ class HandwritingDataset(Dataset):
         # Character as one-hot encoded index
         char_idx = self.char_to_idx[sample.character]
 
+        # Emotional state as index
+        emotion_idx = self.EMOTION_TO_IDX.get(sample.emotional_state, 0)  # Default to neutral
+
+        # Intensity as scalar
+        intensity = sample.intensity
+
         # Stroke sequence (dx, dy, pressure, pen_up)
         sequence = sample.to_sequence()
 
@@ -103,6 +117,8 @@ class HandwritingDataset(Dataset):
 
         return {
             'char_idx': char_idx,
+            'emotion_idx': emotion_idx,
+            'intensity': intensity,
             'sequence': torch.FloatTensor(padded),
             'seq_len': len(sequence)
         }
@@ -114,16 +130,21 @@ class HandwritingDataset(Dataset):
 
 class Char2StrokeLSTM(nn.Module):
     """
-    Character-to-Stroke LSTM
+    Character-to-Stroke LSTM with Emotional Conditioning
 
-    Input: Character embedding
+    Input: Character embedding + Emotion embedding + Intensity + Previous stroke
     Output: Sequence of (dx, dy, pressure, pen_up) predictions
+
+    Key: The model learns how handwriting changes with emotion from training data,
+    not from preset algorithmic transformations.
     """
 
     def __init__(
         self,
         num_chars: int,
+        num_emotions: int = 7,  # neutral, excited, thoughtful, calm, urgent, formal, empathetic
         embedding_dim: int = 64,
+        emotion_dim: int = 16,
         hidden_dim: int = 128,
         num_layers: int = 2,
         dropout: float = 0.2
@@ -131,16 +152,21 @@ class Char2StrokeLSTM(nn.Module):
         super().__init__()
 
         self.num_chars = num_chars
+        self.num_emotions = num_emotions
         self.embedding_dim = embedding_dim
+        self.emotion_dim = emotion_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
 
         # Character embedding
         self.char_embedding = nn.Embedding(num_chars, embedding_dim)
 
-        # LSTM
+        # Emotion embedding (learns emotional variation patterns)
+        self.emotion_embedding = nn.Embedding(num_emotions, emotion_dim)
+
+        # LSTM - now conditioned on character + emotion + intensity + previous stroke
         self.lstm = nn.LSTM(
-            input_size=embedding_dim + 4,  # embedding + previous (dx, dy, pressure, pen_up)
+            input_size=embedding_dim + emotion_dim + 1 + 4,  # char + emotion + intensity + (dx,dy,pressure,pen_up)
             hidden_size=hidden_dim,
             num_layers=num_layers,
             dropout=dropout if num_layers > 1 else 0,
@@ -152,10 +178,12 @@ class Char2StrokeLSTM(nn.Module):
         self.fc_pressure = nn.Linear(hidden_dim, 1)  # pressure (0-1)
         self.fc_pen_up = nn.Linear(hidden_dim, 1)  # pen_up (sigmoid)
 
-    def forward(self, char_idx, prev_strokes, hidden=None):
+    def forward(self, char_idx, emotion_idx, intensity, prev_strokes, hidden=None):
         """
         Args:
             char_idx: (batch_size,) character indices
+            emotion_idx: (batch_size,) emotion indices (0-6)
+            intensity: (batch_size,) intensity values (0-1)
             prev_strokes: (batch_size, seq_len, 4) previous stroke deltas
             hidden: Optional LSTM hidden state
 
@@ -168,11 +196,20 @@ class Char2StrokeLSTM(nn.Module):
         # Character embedding
         char_emb = self.char_embedding(char_idx)  # (batch_size, embedding_dim)
 
-        # Expand to match sequence length
-        char_emb_seq = char_emb.unsqueeze(1).expand(-1, seq_len, -1)  # (batch_size, seq_len, embedding_dim)
+        # Emotion embedding (learns how emotions affect handwriting)
+        emotion_emb = self.emotion_embedding(emotion_idx)  # (batch_size, emotion_dim)
 
-        # Concatenate character embedding with previous strokes
-        lstm_input = torch.cat([char_emb_seq, prev_strokes], dim=2)  # (batch_size, seq_len, embedding_dim + 4)
+        # Intensity as feature
+        intensity_feat = intensity.unsqueeze(1)  # (batch_size, 1)
+
+        # Combine character + emotion + intensity
+        combined = torch.cat([char_emb, emotion_emb, intensity_feat], dim=1)  # (batch_size, embedding_dim + emotion_dim + 1)
+
+        # Expand to match sequence length
+        combined_seq = combined.unsqueeze(1).expand(-1, seq_len, -1)  # (batch_size, seq_len, embedding_dim + emotion_dim + 1)
+
+        # Concatenate with previous strokes
+        lstm_input = torch.cat([combined_seq, prev_strokes], dim=2)  # (batch_size, seq_len, embedding_dim + emotion_dim + 1 + 4)
 
         # LSTM
         lstm_out, hidden = self.lstm(lstm_input, hidden)  # (batch_size, seq_len, hidden_dim)
@@ -200,6 +237,8 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
 
     for batch in dataloader:
         char_idx = batch['char_idx'].to(device)
+        emotion_idx = batch['emotion_idx'].to(device)
+        intensity = batch['intensity'].to(device)
         sequence = batch['sequence'].to(device)
         seq_len = batch['seq_len']
 
@@ -211,7 +250,7 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
         prev_strokes = torch.zeros_like(sequence)
         prev_strokes[:, 1:, :] = sequence[:, :-1, :]
 
-        predictions, _ = model(char_idx, prev_strokes)
+        predictions, _ = model(char_idx, emotion_idx, intensity, prev_strokes)
 
         # Loss (MSE for dx, dy, pressure + BCE for pen_up)
         mse_loss = criterion['mse'](predictions[:, :, :3], sequence[:, :, :3])
@@ -237,12 +276,14 @@ def evaluate(model, dataloader, criterion, device):
     with torch.no_grad():
         for batch in dataloader:
             char_idx = batch['char_idx'].to(device)
+            emotion_idx = batch['emotion_idx'].to(device)
+            intensity = batch['intensity'].to(device)
             sequence = batch['sequence'].to(device)
 
             prev_strokes = torch.zeros_like(sequence)
             prev_strokes[:, 1:, :] = sequence[:, :-1, :]
 
-            predictions, _ = model(char_idx, prev_strokes)
+            predictions, _ = model(char_idx, emotion_idx, intensity, prev_strokes)
 
             mse_loss = criterion['mse'](predictions[:, :, :3], sequence[:, :, :3])
             bce_loss = criterion['bce'](predictions[:, :, 3:4], sequence[:, :, 3:4])
@@ -264,20 +305,24 @@ def export_to_onnx(model, char_to_idx, output_path):
 
     # Dummy inputs for tracing
     dummy_char_idx = torch.tensor([0], dtype=torch.long)
+    dummy_emotion_idx = torch.tensor([0], dtype=torch.long)  # neutral
+    dummy_intensity = torch.tensor([0.5], dtype=torch.float32)
     dummy_prev_strokes = torch.zeros(1, 50, 4, dtype=torch.float32)  # Max seq length 50
 
     # Export
     torch.onnx.export(
         model,
-        (dummy_char_idx, dummy_prev_strokes),
+        (dummy_char_idx, dummy_emotion_idx, dummy_intensity, dummy_prev_strokes),
         output_path,
         export_params=True,
         opset_version=11,
         do_constant_folding=True,
-        input_names=['char_idx', 'prev_strokes'],
+        input_names=['char_idx', 'emotion_idx', 'intensity', 'prev_strokes'],
         output_names=['predictions'],
         dynamic_axes={
             'char_idx': {0: 'batch_size'},
+            'emotion_idx': {0: 'batch_size'},
+            'intensity': {0: 'batch_size'},
             'prev_strokes': {0: 'batch_size', 1: 'seq_len'},
             'predictions': {0: 'batch_size', 1: 'seq_len'}
         }
@@ -387,17 +432,30 @@ def main():
     model.load_state_dict(torch.load('best_model.pt'))
     export_to_onnx(model, char_to_idx, args.output)
 
-    # Save character mapping
+    # Save character and emotion mappings
     mapping_path = Path(args.output).with_suffix('.json')
     with open(mapping_path, 'w') as f:
         json.dump({
             'char_to_idx': char_to_idx,
             'idx_to_char': idx_to_char,
-            'num_chars': len(char_to_idx)
+            'num_chars': len(char_to_idx),
+            'emotions': HandwritingDataset.EMOTIONS,
+            'emotion_to_idx': HandwritingDataset.EMOTION_TO_IDX
         }, f, indent=2)
 
-    print(f"✅ Character mapping saved to {mapping_path}")
+    print(f"✅ Character and emotion mappings saved to {mapping_path}")
     print("\n🎉 Training complete!")
+    print("\n📊 Emotional breakdown:")
+
+    # Print sample distribution by emotion
+    emotion_counts = {}
+    for sample in samples:
+        emotion = sample.emotional_state
+        emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
+
+    for emotion, count in sorted(emotion_counts.items()):
+        pct = (count / len(samples)) * 100
+        print(f"   {emotion}: {count} samples ({pct:.1f}%)")
 
 
 if __name__ == '__main__':
