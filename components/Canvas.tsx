@@ -184,6 +184,8 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     const canvasWidth = canvas.width / state.scale;
 
     ctx.save();
+
+    // --- HORIZONTAL GUIDELINES ---
     ctx.strokeStyle = guides.color;
     ctx.globalAlpha = guides.opacity;
     ctx.lineWidth = 1;
@@ -191,35 +193,152 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
 
     // Draw horizontal guide lines
     const lines = [
-      { y: guides.baseline - guides.ascender, label: 'Ascender' },
-      { y: guides.baseline - guides.capHeight, label: 'Cap Height' },
-      { y: guides.baseline - guides.xHeight, label: 'X-Height' },
-      { y: guides.baseline, label: 'Baseline', bold: true },
-      { y: guides.baseline + guides.descender, label: 'Descender' },
+      { y: guides.baseline - guides.ascender, label: 'Ascender', color: '#3b82f6' },
+      { y: guides.baseline - guides.capHeight, label: 'Cap Height', color: '#8b5cf6' },
+      { y: guides.baseline - guides.xHeight, label: 'X-Height', color: '#10b981' },
+      { y: guides.baseline, label: 'Baseline', bold: true, color: '#ef4444' },
+      { y: guides.baseline + guides.descender, label: 'Descender', color: '#f59e0b' },
     ];
 
     lines.forEach(line => {
+      ctx.strokeStyle = line.color;
+      ctx.globalAlpha = line.bold ? 0.6 : guides.opacity;
+      ctx.lineWidth = line.bold ? 2 : 1;
+
+      if (!line.bold) {
+        ctx.setLineDash([5, 5]);
+      } else {
+        ctx.setLineDash([10, 5]);
+      }
+
       ctx.beginPath();
       ctx.moveTo(0, line.y);
       ctx.lineTo(canvasWidth, line.y);
       ctx.stroke();
 
-      // Draw label
-      if (line.bold) {
-        ctx.setLineDash([]);
-        ctx.lineWidth = 2;
-      }
-
+      // Draw label on left
       ctx.globalAlpha = 1;
-      ctx.fillStyle = guides.color;
-      ctx.font = '12px sans-serif';
+      ctx.fillStyle = line.color;
+      ctx.font = line.bold ? 'bold 12px sans-serif' : '11px sans-serif';
       ctx.fillText(line.label, 10, line.y - 5);
-      ctx.globalAlpha = guides.opacity;
 
-      if (line.bold) {
-        ctx.setLineDash([5, 5]);
-        ctx.lineWidth = 1;
-      }
+      // Draw label on right for clarity
+      ctx.textAlign = 'right';
+      ctx.fillText(line.label, canvasWidth - 10, line.y - 5);
+      ctx.textAlign = 'left';
+    });
+
+    // --- VERTICAL SPACING GUIDES (for letter width consistency) ---
+    ctx.globalAlpha = 0.15;
+    ctx.setLineDash([3, 8]);
+    ctx.lineWidth = 0.5;
+
+    // Draw vertical guides at regular intervals (letter width guides)
+    const letterWidthGuide = guides.xHeight * 0.8; // Approximate letter width
+    for (let x = 100; x < canvasWidth; x += letterWidthGuide) {
+      ctx.strokeStyle = '#94a3b8'; // slate-400
+      ctx.beginPath();
+      ctx.moveTo(x, guides.baseline - guides.ascender - 20);
+      ctx.lineTo(x, guides.baseline + guides.descender + 20);
+      ctx.stroke();
+    }
+
+    // --- SLANT ANGLE GUIDE (for cursive consistency) ---
+    // Draw slanted guides to help maintain consistent slant
+    ctx.globalAlpha = 0.12;
+    ctx.setLineDash([2, 10]);
+    ctx.strokeStyle = '#8b5cf6'; // purple-500
+    const slantAngle = 15; // degrees (typical cursive slant)
+    const slantSpacing = 80;
+
+    for (let x = 100; x < canvasWidth; x += slantSpacing) {
+      const dx = Math.tan((slantAngle * Math.PI) / 180) * (guides.ascender + guides.descender);
+      ctx.beginPath();
+      ctx.moveTo(x - dx / 2, guides.baseline - guides.ascender);
+      ctx.lineTo(x + dx / 2, guides.baseline + guides.descender);
+      ctx.stroke();
+    }
+
+    // --- CONNECTION POINT GUIDES (for cursive connections) ---
+    // Show where letters typically connect (at baseline or slightly above)
+    ctx.globalAlpha = 0.3;
+    ctx.setLineDash([]);
+    ctx.strokeStyle = '#f59e0b'; // amber-500
+    ctx.lineWidth = 2;
+
+    // Connection height (typically 1/3 up from baseline to x-height)
+    const connectionY = guides.baseline - (guides.xHeight / 3);
+
+    // Draw connection point markers (small circles)
+    for (let x = 100 + letterWidthGuide; x < canvasWidth; x += letterWidthGuide) {
+      ctx.beginPath();
+      ctx.arc(x, connectionY, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+    }
+
+    // --- TRAINING MODE SPECIFIC GUIDES ---
+    if (state.trainingMode.active) {
+      // Draw character positioning box (where to write the current character)
+      const boxX = 120;
+      const boxWidth = guides.xHeight * 1.2; // Character width guide
+
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = '#06b6d4'; // cyan-500
+      ctx.lineWidth = 2;
+      ctx.setLineDash([10, 5]);
+
+      // Draw vertical boundaries for character
+      ctx.beginPath();
+      ctx.moveTo(boxX, guides.baseline - guides.ascender - 10);
+      ctx.lineTo(boxX, guides.baseline + guides.descender + 10);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(boxX + boxWidth, guides.baseline - guides.ascender - 10);
+      ctx.lineTo(boxX + boxWidth, guides.baseline + guides.descender + 10);
+      ctx.stroke();
+
+      // Draw "write here" indicator
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#06b6d4';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✏️ Write here', boxX + boxWidth / 2, guides.baseline - guides.ascender - 25);
+      ctx.textAlign = 'left';
+    }
+
+    // --- LEGEND (top-right corner) ---
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.fillRect(canvasWidth - 180, 10, 170, 140);
+
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(canvasWidth - 180, 10, 170, 140);
+
+    ctx.globalAlpha = 1;
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = '#1e293b';
+    ctx.fillText('Typography Guides', canvasWidth - 175, 25);
+
+    ctx.font = '10px sans-serif';
+    const legendItems = [
+      { color: '#ef4444', label: 'Baseline (sit letters)' },
+      { color: '#10b981', label: 'X-Height (lowercase)' },
+      { color: '#8b5cf6', label: 'Cap Height (uppercase)' },
+      { color: '#3b82f6', label: 'Ascender (b,d,h,k,l,t)' },
+      { color: '#f59e0b', label: 'Descender (g,j,p,q,y)' },
+      { color: '#8b5cf6', label: 'Slant Guide (~15°)' },
+      { color: '#f59e0b', label: 'Connection Points' },
+    ];
+
+    legendItems.forEach((item, i) => {
+      const y = 45 + i * 14;
+      ctx.fillStyle = item.color;
+      ctx.fillRect(canvasWidth - 170, y - 6, 10, 3);
+      ctx.fillStyle = '#475569';
+      ctx.fillText(item.label, canvasWidth - 155, y);
     });
 
     ctx.restore();
