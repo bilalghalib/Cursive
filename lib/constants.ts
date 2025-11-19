@@ -47,6 +47,80 @@ export const TRAINING = {
     'and', 'the', 'is', 'of', 'to', 'in', 'it', 'for', 'you', 'that',
     'with', 'from', 'have', 'this', 'but'
   ],
+
+  /** Emotional states for Living Fonts training */
+  EMOTIONS: ['neutral', 'excited', 'thoughtful', 'calm', 'urgent'] as const,
+
+  /** Environment/music suggestions for each emotional state */
+  EMOTION_PROMPTS: {
+    neutral: {
+      title: 'Neutral Baseline',
+      prompt: 'Write naturally and comfortably',
+      music: 'Optional: Light background music',
+      icon: '📝',
+      color: '#64748b' // slate-500
+    },
+    excited: {
+      title: 'Excited State',
+      prompt: 'Feel energized! Stand up, smile, get pumped!',
+      music: '🎵 Suggestion: Play upbeat music (pop, electronic, dance)',
+      icon: '🎉',
+      color: '#f97316' // orange-500
+    },
+    thoughtful: {
+      title: 'Thoughtful State',
+      prompt: 'Think deeply. Contemplate a complex problem.',
+      music: '🎼 Suggestion: Play lo-fi, ambient, or classical music',
+      icon: '💭',
+      color: '#8b5cf6' // purple-500
+    },
+    calm: {
+      title: 'Calm State',
+      prompt: 'Deep breaths. Feel peaceful and relaxed.',
+      music: '😌 Suggestion: Play meditation or nature sounds',
+      icon: '😌',
+      color: '#0ea5e9' // sky-500
+    },
+    urgent: {
+      title: 'Urgent State',
+      prompt: 'Feel rushed! Set a 30-second timer, imagine being late!',
+      music: '⚡ Suggestion: Set timer on your device, feel the rush!',
+      icon: '⚡',
+      color: '#ef4444' // red-500
+    }
+  },
+
+  /** Emotional sentences for realistic training */
+  EMOTIONAL_SENTENCES: {
+    excited: [
+      "This is amazing! I love this project!",
+      "Wow! I can't believe how well this works!",
+      "Yes! Finally got it working!",
+      "This is going to be incredible!",
+      "I'm so pumped about this idea!"
+    ],
+    thoughtful: [
+      "Let me think about this carefully...",
+      "There are many factors to consider here.",
+      "I wonder if there's a better approach.",
+      "This requires deep consideration.",
+      "What if we looked at it this way?"
+    ],
+    calm: [
+      "Everything is peaceful and clear.",
+      "I feel relaxed and centered.",
+      "There's no rush, take your time.",
+      "Breathe deeply and stay present.",
+      "This moment is all that matters."
+    ],
+    urgent: [
+      "Quick! We need to finish this now!",
+      "Hurry! The deadline is approaching!",
+      "Fast! Write this down before I forget!",
+      "Now! Don't waste any time!",
+      "Urgent: This needs immediate attention!"
+    ]
+  },
 } as const;
 
 export const CANVAS = {
