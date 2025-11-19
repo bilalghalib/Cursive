@@ -1,577 +1,437 @@
-# 🚀 Cursive Setup Guide
+# Cursive Setup Guide
 
-Complete setup instructions for deploying Cursive with Phase 1 & 2 features (Authentication, Database, Billing, Rate Limiting).
+Complete guide to setting up and deploying Cursive.
 
 ---
 
 ## 📋 Prerequisites
 
-Before setting up Cursive, ensure you have:
+Before you begin, ensure you have:
 
-### Required
-- **Python 3.8+** installed
-- **PostgreSQL 12+** installed and running
-- **Anthropic API Key** from [console.anthropic.com](https://console.anthropic.com)
-
-### Optional (Recommended for Production)
-- **Redis 6+** for session storage and rate limiting
-- **Stripe Account** for billing (if monetizing)
-- **Domain name** for production deployment
+- **Node.js 18+** and npm installed
+- **Git** for version control
+- **Supabase account** (free tier works) - [Sign up here](https://supabase.com)
+- **Anthropic API key** (optional if using BYOK) - [Get one here](https://console.anthropic.com/)
+- **Vercel account** (optional, for deployment) - [Sign up here](https://vercel.com)
 
 ---
 
-## 🛠️ Quick Start (Development)
+## 🚀 Quick Start (Local Development)
 
-### 1. Clone and Install Dependencies
+### Step 1: Clone Repository
 
 ```bash
-# Clone repository
-git clone <your-repo-url>
+git clone https://github.com/bilalghalib/Cursive.git
 cd Cursive
-
-# Install Python dependencies
-pip install -r requirements.txt
 ```
 
-### 2. Run Setup Wizard
+### Step 2: Install Dependencies
 
 ```bash
-# This will create .env file with generated keys
-python setup.py
+npm install
 ```
 
-### 3. Configure Environment
+This will install:
+- Next.js 15
+- React 18
+- TypeScript
+- Tailwind CSS 4
+- Supabase client
+- perfect-freehand
+- Other dependencies
 
-Edit the generated `.env` file and add your credentials:
+### Step 3: Set Up Supabase
+
+#### 3.1 Create a Supabase Project
+
+1. Go to [https://supabase.com/dashboard](https://supabase.com/dashboard)
+2. Click "New Project"
+3. Fill in:
+   - **Name:** Cursive (or your preferred name)
+   - **Database Password:** Choose a strong password (save this!)
+   - **Region:** Choose closest to your users
+4. Click "Create new project" and wait ~2 minutes
+
+#### 3.2 Get Your Supabase Credentials
+
+Once your project is ready:
+
+1. Go to **Settings** > **API**
+2. Copy these values:
+   - **Project URL** (`NEXT_PUBLIC_SUPABASE_URL`)
+   - **anon/public key** (`NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+
+#### 3.3 Apply Database Schema
+
+1. Copy the contents of `database/UNIFIED_SCHEMA.sql`
+2. Go to Supabase Dashboard > **SQL Editor**
+3. Click "New Query"
+4. Paste the schema
+5. Click **Run** (or press Cmd/Ctrl + Enter)
+6. Verify: You should see "Schema is now ready" message
+
+**What this creates:**
+- `notebooks` table - Collections of drawings
+- `drawings` table - Individual strokes with AI responses
+- `user_handwriting` table - Handwriting training samples
+- `api_usage` table - Token tracking for billing
+- `user_settings` table - User preferences and BYOK keys
+- Row Level Security (RLS) policies for all tables
+- Triggers for auto-updating timestamps
+
+#### 3.4 Enable Email Authentication
+
+1. Go to **Authentication** > **Providers**
+2. Enable **Email** provider
+3. (Optional) Configure email templates in **Authentication** > **Email Templates**
+
+### Step 4: Configure Environment Variables
+
+Create a `.env.local` file in the root directory:
 
 ```bash
-# Required: Add your Anthropic API key
-CLAUDE_API_KEY=sk-ant-your-key-here
+cp .env.example .env.local
+```
 
-# Required: Configure PostgreSQL
-DATABASE_URL=postgresql://username:password@localhost:5432/cursive_db
+Edit `.env.local` with your credentials:
 
-# Optional: Add Redis (recommended)
-REDIS_URL=redis://localhost:6379/0
+```env
+# Supabase (REQUIRED)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 
-# Optional: Add Stripe keys (for billing)
+# Anthropic API (OPTIONAL - only if NOT using BYOK)
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Stripe (OPTIONAL - for billing)
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
-### 4. Initialize Database
+**Notes:**
+- **Supabase credentials are REQUIRED** - the app won't work without them
+- **Anthropic API key is OPTIONAL** - only needed if you want to provide API access for users without their own keys (BYOK)
+- **Stripe keys are OPTIONAL** - only needed if you want to charge users for API usage
+
+### Step 5: Run Development Server
 
 ```bash
-# Create database tables and admin user
-python setup.py --init-db
+npm run dev
 ```
 
-### 5. Run Development Server
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-```bash
-# Start Flask development server
-python proxy.py
-```
+**You should see:**
+- The Cursive canvas interface
+- A "Sign In" button in the toolbar
+- Drawing tools (pencil, select, pan, zoom)
 
-Visit [http://localhost:5022](http://localhost:5022) to access Cursive!
+### Step 6: Test the Application
+
+1. **Sign Up:**
+   - Click "Sign In" button
+   - Click "Sign up" tab
+   - Enter email and password (min 6 characters)
+   - Check your email for verification link
+   - Click verification link
+
+2. **Sign In:**
+   - Return to app
+   - Click "Sign In"
+   - Enter credentials
+   - You should now see your email in the user menu
+
+3. **Draw:**
+   - Select the pencil tool
+   - Draw on the canvas (works best with stylus/Apple Pencil)
+   - Your strokes should appear in black
+
+4. **Test AI (requires Anthropic API key):**
+   - Write some text by hand
+   - Select the selection tool
+   - Drag a box around your handwriting
+   - AI should transcribe and respond (appears in indigo/purple)
+
+5. **Test Student Mode:**
+   - Click "Student Mode" button in toolbar
+   - AI responses should disappear
+   - Click "Full View" to show them again
 
 ---
 
-## 🗄️ Database Setup
+## 🌐 Production Deployment (Vercel)
 
-### PostgreSQL Installation
+### Prerequisites
 
-#### macOS (Homebrew)
-```bash
-brew install postgresql@15
-brew services start postgresql@15
+- Vercel account ([sign up free](https://vercel.com))
+- Supabase project set up (from above)
+- Git repository pushed to GitHub/GitLab/Bitbucket
 
-# Create database
-createdb cursive_db
-```
+### Step 1: Connect Repository to Vercel
 
-#### Ubuntu/Debian
-```bash
-sudo apt update
-sudo apt install postgresql postgresql-contrib
+1. Go to [https://vercel.com/new](https://vercel.com/new)
+2. Click "Import Git Repository"
+3. Select your Cursive repository
+4. Click "Import"
 
-# Start service
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
+### Step 2: Configure Environment Variables
 
-# Create database
-sudo -u postgres createdb cursive_db
-```
-
-#### Windows
-Download PostgreSQL installer from [postgresql.org](https://www.postgresql.org/download/windows/)
-
-### Create Database User
-
-```sql
--- Connect to PostgreSQL
-psql -U postgres
-
--- Create user
-CREATE USER cursive_user WITH PASSWORD 'secure_password_here';
-
--- Create database
-CREATE DATABASE cursive_db OWNER cursive_user;
-
--- Grant privileges
-GRANT ALL PRIVILEGES ON DATABASE cursive_db TO cursive_user;
-```
-
-### Connection String Format
+In Vercel project settings, add these environment variables:
 
 ```
-postgresql://username:password@host:port/database_name
-
-# Local example:
-DATABASE_URL=postgresql://cursive_user:secure_password@localhost:5432/cursive_db
-
-# Remote example:
-DATABASE_URL=postgresql://user:pass@db.example.com:5432/cursive_prod
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ANTHROPIC_API_KEY=sk-ant-your-key (optional)
 ```
+
+**How to add:**
+1. Go to your Vercel project
+2. Click **Settings** > **Environment Variables**
+3. Add each variable:
+   - Key: `NEXT_PUBLIC_SUPABASE_URL`
+   - Value: Your Supabase URL
+   - Click "Add"
+4. Repeat for each variable
+
+### Step 3: Deploy
+
+1. Click **Deploy** button
+2. Wait ~2-3 minutes for build to complete
+3. Visit your deployment URL (e.g., `cursive-xyz.vercel.app`)
+
+### Step 4: Configure Supabase for Production
+
+Update your Supabase project to allow your production domain:
+
+1. Go to Supabase Dashboard > **Authentication** > **URL Configuration**
+2. Add your Vercel domain to **Site URL**:
+   - Example: `https://cursive-xyz.vercel.app`
+3. Add to **Redirect URLs**:
+   - `https://cursive-xyz.vercel.app`
+   - `https://cursive-xyz.vercel.app/**`
+
+### Step 5: Test Production Deployment
+
+1. Visit your Vercel URL
+2. Sign up with a test account
+3. Verify email works
+4. Test drawing and AI features
+5. Test Student Mode toggle
 
 ---
 
-## 🔴 Redis Setup (Optional but Recommended)
+## 🔧 Advanced Configuration
 
-Redis is used for:
-- Session storage (faster than filesystem)
-- Rate limiting (distributed across multiple servers)
+### Custom Domain
 
-### Installation
+1. Go to Vercel project > **Settings** > **Domains**
+2. Add your custom domain (e.g., `cursive.app`)
+3. Follow DNS instructions
+4. Update Supabase URL configuration with new domain
 
-#### macOS
-```bash
-brew install redis
-brew services start redis
-```
+### Enable Stripe Billing (Optional)
 
-#### Ubuntu/Debian
-```bash
-sudo apt install redis-server
-sudo systemctl start redis
-sudo systemctl enable redis
-```
+If you want to charge users for API usage:
 
-#### Docker
-```bash
-docker run -d -p 6379:6379 redis:alpine
-```
+1. **Create Stripe account:** [https://stripe.com](https://stripe.com)
+2. **Get API keys:**
+   - Dashboard > **Developers** > **API keys**
+   - Copy **Secret key** and **Publishable key**
+3. **Add to environment variables:**
+   ```
+   STRIPE_SECRET_KEY=sk_test_...
+   STRIPE_PUBLISHABLE_KEY=pk_test_...
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+   ```
+4. **Create products in Stripe:**
+   - Free tier: 10,000 tokens/month
+   - Pro tier: $9/month + 50,000 tokens
+   - Tokens: $0.02 per 1,000 tokens (15% markup)
 
-### Configuration
+### Supabase Edge Functions (Optional)
 
-```bash
-# In .env file:
-REDIS_URL=redis://localhost:6379/0
+If you want to deploy the Claude API proxy as a Supabase Edge Function:
 
-# For Redis with password:
-REDIS_URL=redis://:password@localhost:6379/0
-```
+1. Install Supabase CLI:
+   ```bash
+   npm install -g supabase
+   ```
 
----
+2. Link to your project:
+   ```bash
+   supabase link --project-ref your-project-ref
+   ```
 
-## 💳 Stripe Setup (For Billing)
+3. Deploy edge function:
+   ```bash
+   supabase functions deploy claude-proxy
+   ```
 
-### 1. Create Stripe Account
+4. Set secrets:
+   ```bash
+   supabase secrets set ANTHROPIC_API_KEY=sk-ant-your-key
+   ```
 
-Go to [stripe.com](https://stripe.com) and create an account.
-
-### 2. Get API Keys
-
-From the Stripe Dashboard:
-1. Click **Developers** → **API keys**
-2. Copy your **Secret key** and **Publishable key**
-
-### 3. Create Products and Prices
-
-#### Pro Tier ($9/month)
-1. Go to **Products** → **Add product**
-2. Name: "Cursive Pro"
-3. Pricing model: Recurring
-4. Price: $9.00 USD per month
-5. Copy the **Price ID** (starts with `price_...`)
-
-#### Enterprise Tier (Custom)
-Same steps as above, or use custom pricing.
-
-### 4. Configure Webhook
-
-1. Go to **Developers** → **Webhooks**
-2. Click **Add endpoint**
-3. Endpoint URL: `https://yourdomain.com/api/billing/webhook`
-4. Events to send:
-   - `checkout.session.completed`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-   - `invoice.payment_failed`
-5. Copy **Signing secret** (starts with `whsec_...`)
-
-### 5. Add to .env
-
-```bash
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-
-# Add price IDs
-STRIPE_PRO_PRICE_ID=price_...
-STRIPE_ENTERPRISE_PRICE_ID=price_...
-```
+**Note:** Currently the app uses Next.js API routes. Edge Functions are an alternative deployment option.
 
 ---
 
-## 🔐 Security Configuration
+## 🔐 Security Checklist
 
-### Generate Encryption Key
+Before launching publicly:
 
-The encryption key is used to securely store user API keys (BYOK feature).
+### Database Security
+- ✅ RLS policies enabled on all tables
+- ✅ API keys stored encrypted
+- ✅ No public access to user data
+- ✅ Audit logs for admin actions
 
-```bash
-# Generate key
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+### Authentication
+- ✅ Email verification required
+- ✅ Strong password requirements (min 6 characters, recommend 12+)
+- ✅ Secure session cookies (httpOnly, sameSite)
+- ✅ Rate limiting on auth endpoints
 
-# Add to .env
-ENCRYPTION_KEY=generated_key_here
-```
+### API Security
+- ✅ CORS configured (not wildcard)
+- ✅ Input validation on all endpoints
+- ✅ Rate limiting on AI requests
+- ✅ Token usage tracking and limits
 
-### Configure CORS
-
-```bash
-# In .env file, set allowed origins (comma-separated)
-ALLOWED_ORIGINS=http://localhost:5022,https://yourdomain.com,https://app.yourdomain.com
-```
-
-### Production Security Checklist
-
-- [ ] Use HTTPS (not HTTP)
-- [ ] Set strong `FLASK_SECRET_KEY`
-- [ ] Restrict `ALLOWED_ORIGINS` to your domains only
-- [ ] Use strong database passwords
-- [ ] Enable Redis password authentication
-- [ ] Keep API keys in `.env` (never commit to Git)
-- [ ] Set `FLASK_ENV=production`
-
----
-
-## 🌐 Production Deployment
-
-### Using Gunicorn (Recommended)
-
-```bash
-# Install Gunicorn
-pip install gunicorn
-
-# Run with 4 worker processes
-gunicorn wsgi:app --bind 0.0.0.0:5022 --workers 4
-```
-
-### Using Docker
-
-Create `Dockerfile`:
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application
-COPY . .
-
-# Expose port
-EXPOSE 5022
-
-# Run with Gunicorn
-CMD ["gunicorn", "wsgi:app", "--bind", "0.0.0.0:5022", "--workers", "4"]
-```
-
-Build and run:
-
-```bash
-docker build -t cursive .
-docker run -p 5022:5022 --env-file .env cursive
-```
-
-### Using Docker Compose
-
-Create `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  web:
-    build: .
-    ports:
-      - "5022:5022"
-    environment:
-      - DATABASE_URL=postgresql://cursive:password@db:5432/cursive_db
-      - REDIS_URL=redis://redis:6379/0
-    env_file:
-      - .env
-    depends_on:
-      - db
-      - redis
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: cursive_db
-      POSTGRES_USER: cursive
-      POSTGRES_PASSWORD: password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:alpine
-    volumes:
-      - redis_data:/data
-
-volumes:
-  postgres_data:
-  redis_data:
-```
-
-Run:
-
-```bash
-docker-compose up -d
-```
-
-### Nginx Reverse Proxy
-
-Create `/etc/nginx/sites-available/cursive`:
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:5022;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # WebSocket support for streaming
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
-
-Enable and restart:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/cursive /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
-### SSL Certificate (Let's Encrypt)
-
-```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d yourdomain.com
-```
-
----
-
-## 🧪 Testing the Setup
-
-### Health Check
-
-```bash
-curl http://localhost:5022/health
-```
-
-Expected response:
-```json
-{
-  "status": "ok",
-  "database": "connected"
-}
-```
-
-### Create Test User
-
-```bash
-curl -X POST http://localhost:5022/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "SecurePass123!"
-  }'
-```
-
-### Test Login
-
-```bash
-curl -X POST http://localhost:5022/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "SecurePass123!"
-  }'
-```
-
----
-
-## 📊 Monitoring
-
-### Database Queries
-
-```sql
--- Check users
-SELECT id, email, subscription_tier, created_at FROM users;
-
--- Check API usage
-SELECT user_id, SUM(tokens_used) as total_tokens, SUM(cost) as total_cost
-FROM api_usage
-GROUP BY user_id;
-
--- Check active subscriptions
-SELECT u.email, b.subscription_status, b.tokens_used_this_period
-FROM users u
-JOIN billing b ON u.id = b.user_id
-WHERE b.subscription_status = 'active';
-```
-
-### Logs
-
-```bash
-# Development
-tail -f logs/cursive.log
-
-# Production (Gunicorn)
-tail -f /var/log/cursive/access.log
-tail -f /var/log/cursive/error.log
-```
+### Privacy
+- ✅ Privacy policy published
+- ✅ COPPA compliance (if targeting children under 13)
+- ✅ GDPR compliance (if serving EU users)
+- ✅ Data retention policy
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Database Connection Failed
+### "Supabase is not configured" Error
 
-**Problem:** `psycopg2.OperationalError: could not connect to server`
+**Problem:** App shows error about missing Supabase configuration
 
-**Solutions:**
-1. Check PostgreSQL is running: `sudo systemctl status postgresql`
-2. Verify DATABASE_URL format in `.env`
-3. Test connection: `psql -U cursive_user -d cursive_db`
-4. Check PostgreSQL logs: `/var/log/postgresql/`
+**Solution:**
+1. Verify `.env.local` exists and has correct values
+2. Check environment variables are prefixed with `NEXT_PUBLIC_`
+3. Restart dev server after changing env vars
+4. For Vercel: check environment variables in project settings
 
-### Redis Connection Failed
+### Database Connection Error
 
-**Problem:** `redis.exceptions.ConnectionError: Error connecting to Redis`
+**Problem:** Can't connect to Supabase
 
-**Solutions:**
-1. Check Redis is running: `redis-cli ping` (should return `PONG`)
-2. Verify REDIS_URL in `.env`
-3. Disable Redis in .env for development (will use filesystem sessions)
+**Solution:**
+1. Verify project URL is correct (should end with `.supabase.co`)
+2. Check if database is paused (free tier pauses after inactivity)
+3. Verify RLS policies are set up correctly
+4. Check Supabase project status in dashboard
 
-### Import Errors
+### Auth Not Working
 
-**Problem:** `ModuleNotFoundError: No module named 'flask_sqlalchemy'`
+**Problem:** Can't sign up or sign in
 
-**Solutions:**
-```bash
-pip install -r requirements.txt
-```
+**Solution:**
+1. Check Email provider is enabled in Supabase
+2. Verify site URL matches your domain
+3. Check spam folder for verification emails
+4. Review Supabase Auth logs for errors
+5. Ensure RLS policies allow user creation
 
-### Port Already in Use
+### AI Responses Not Appearing
 
-**Problem:** `OSError: [Errno 48] Address already in use`
+**Problem:** Selection works but no AI response
 
-**Solutions:**
-```bash
-# Find process using port 5022
-lsof -i :5022
+**Solution:**
+1. Check `ANTHROPIC_API_KEY` is set (if not using BYOK)
+2. Verify API key is valid in Anthropic console
+3. Check browser console for errors
+4. Verify network requests in DevTools
+5. Check API usage limits not exceeded
 
-# Kill process
-kill -9 <PID>
+### Student Mode Not Working
 
-# Or use different port in proxy.py
-```
+**Problem:** Toggle button doesn't hide AI responses
 
-### Rate Limit Errors in Development
-
-**Problem:** Getting 429 errors while testing
-
-**Solutions:**
-```bash
-# In .env, disable rate limiting temporarily
-RATE_LIMIT_ENABLED=false
-```
-
----
-
-## 🔄 Database Migrations
-
-If you modify database models, create migrations:
-
-```bash
-# Initialize Alembic (first time only)
-flask db init
-
-# Create migration
-flask db migrate -m "Description of changes"
-
-# Apply migration
-flask db upgrade
-
-# Rollback if needed
-flask db downgrade
-```
+**Solution:**
+1. Clear browser cache and reload
+2. Check if overlays have `isAI: true` flag
+3. Verify toggle state in React DevTools
+4. Check browser console for errors
 
 ---
 
-## 📚 Additional Resources
+## 📊 Monitoring
 
-- **Anthropic API Docs:** [docs.anthropic.com](https://docs.anthropic.com)
-- **Stripe Docs:** [stripe.com/docs](https://stripe.com/docs)
-- **Flask Docs:** [flask.palletsprojects.com](https://flask.palletsprojects.com)
-- **PostgreSQL Docs:** [postgresql.org/docs](https://www.postgresql.org/docs)
+### Production Monitoring
+
+Recommended tools:
+
+1. **Error Tracking:** [Sentry](https://sentry.io)
+   ```bash
+   npm install @sentry/nextjs
+   npx @sentry/wizard -i nextjs
+   ```
+
+2. **Analytics:** [Vercel Analytics](https://vercel.com/analytics)
+   - Built-in, no setup needed
+
+3. **Database:** Supabase Dashboard
+   - Query performance
+   - Row count metrics
+   - API usage stats
+
+### Key Metrics to Monitor
+
+- **User signups** - Track growth
+- **Active users** - Daily/weekly active
+- **API token usage** - Cost monitoring
+- **Error rate** - Application health
+- **Student mode usage** - Feature adoption
+- **Export frequency** - User engagement
 
 ---
 
-## 💬 Support
+## 🆘 Support
 
-For issues or questions:
-1. Check the [GitHub Issues](https://github.com/yourusername/Cursive/issues)
-2. Review CLAUDE.md for architecture details
-3. Review README.md for feature documentation
+### Documentation
+
+- **Project Overview:** [CLAUDE.md](./CLAUDE.md)
+- **Core Values:** [REAL_VALUES.md](./REAL_VALUES.md)
+- **Database Schema:** [database/SCHEMA_README.md](./database/SCHEMA_README.md)
+
+### Getting Help
+
+- **GitHub Issues:** [Report bugs](https://github.com/bilalghalib/Cursive/issues)
+- **GitHub Discussions:** [Ask questions](https://github.com/bilalghalib/Cursive/discussions)
+- **Supabase Docs:** [https://supabase.com/docs](https://supabase.com/docs)
+- **Next.js Docs:** [https://nextjs.org/docs](https://nextjs.org/docs)
 
 ---
 
-## ✅ Post-Setup Checklist
+## ✅ Post-Launch Checklist
 
-After completing setup, verify:
+Before announcing your Cursive deployment:
 
-- [ ] Can access http://localhost:5022
-- [ ] Health endpoint returns "ok"
-- [ ] Can register a new user
-- [ ] Can log in
-- [ ] Can draw on canvas
-- [ ] Can transcribe handwriting
-- [ ] AI responds to queries
-- [ ] Rate limiting works (make 50+ requests)
-- [ ] Usage tracking appears in database
-- [ ] (Optional) Stripe checkout works
+- [ ] Test signup/login flow end-to-end
+- [ ] Verify email delivery works
+- [ ] Test on multiple devices (desktop, tablet, iPad)
+- [ ] Confirm Student Mode works correctly
+- [ ] Test AI responses with real handwriting
+- [ ] Verify PDF export includes/excludes AI as expected
+- [ ] Set up error monitoring (Sentry)
+- [ ] Configure backups (Supabase auto-backups enabled)
+- [ ] Publish privacy policy
+- [ ] Publish terms of service
+- [ ] Test payment flow (if using Stripe)
+- [ ] Set up support email/contact form
+- [ ] Create user documentation/tutorials
+- [ ] Prepare demo video for teachers/parents
 
-**Congratulations! Cursive is ready to use! 🎉**
+---
+
+**Ready to launch?** Follow this guide step-by-step, and your Cursive deployment will be live in under an hour.
+
+Need help? Check [CLAUDE.md](./CLAUDE.md) for detailed architecture documentation.
