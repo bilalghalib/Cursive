@@ -4,510 +4,101 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 📋 Project Overview
 
-**Cursive** is an AI-powered digital notebook that combines handwriting input with Claude AI conversation. Users draw on an infinite canvas, select handwritten text for transcription via Claude's vision API, and receive responses in simulated handwriting fonts.
+**Cursive** is an educational handwriting tool where children and students learn with AI as a patient tutor. Users draw on an infinite canvas with pressure-sensitive input, and Claude AI responds in their personal handwriting style.
 
-**Target Users:** Tablet users with stylus (iPad, Surface, etc.)
-**Current Status:** ✅ Phase 1 & 2 Complete! Ready for beta testing with authentication, database, and billing infrastructure.
-
----
-
-## ✅ Phase 1 & 2 Implementation Status
-
-### **COMPLETED FEATURES** (As of 2025-11-12)
-
-#### Phase 1: Security & User Management ✅
-- ✅ **Authentication System**
-  - User registration with password strength validation
-  - Login/logout with Flask-Login
-  - JWT token support for API access
-  - Session management with Flask-Session
-
-- ✅ **API Key Management (BYOK)**
-  - Users can add their own Anthropic API keys
-  - Encrypted storage using Fernet encryption
-  - Automatic API key routing (user's key vs server key)
-
-- ✅ **Rate Limiting**
-  - Redis-based distributed rate limiting
-  - 50 requests/minute, 500/day default limits
-  - Configurable per-tier limits
-  - Exemptions for enterprise users and BYOK users
-
-- ✅ **Security Fixes**
-  - Fixed CORS wildcard vulnerability
-  - Added input validation with Marshmallow schemas
-  - Path traversal protection
-  - Secure session cookies (httpOnly, SameSite)
-  - Request validation for all API endpoints
-
-#### Phase 2: Database & Scalability ✅
-- ✅ **PostgreSQL Database**
-  - SQLAlchemy ORM with models for:
-    - Users (authentication, subscription management)
-    - Notebooks (collections of drawings)
-    - Drawings (canvas data, transcriptions, AI responses)
-    - API Usage (token tracking for billing)
-    - Billing (Stripe subscription management)
-
-- ✅ **REST API Endpoints**
-  - `/api/notebooks` - CRUD operations for notebooks
-  - `/api/drawings` - CRUD operations for drawings
-  - `/api/auth/*` - Authentication endpoints
-  - `/api/billing/*` - Billing and usage endpoints
-  - All endpoints with authentication and validation
-
-- ✅ **Stripe Billing Integration**
-  - Subscription creation and management
-  - Usage tracking with token metering
-  - Webhook handling for subscription events
-  - Cost calculation with markup (15% by default)
-  - Free tier (10K tokens/month) and Pro tier ($9/month, 50K tokens)
-
-### **NEW FILES CREATED**
-
-```
-Cursive/
-├── database.py              # Database connection and initialization
-├── models.py                # SQLAlchemy models (User, Notebook, Drawing, etc.)
-├── auth.py                  # Authentication logic (register, login, JWT)
-├── rate_limiter.py          # Rate limiting with Redis
-├── billing.py               # Stripe integration and usage tracking
-├── api_routes.py            # REST API for notebooks/drawings
-├── setup.py                 # Setup wizard for initial configuration
-├── requirements.txt         # Python dependencies
-├── .env.example             # Environment configuration template
-└── SETUP.md                 # Comprehensive setup documentation
-```
-
-### **FILES UPDATED**
-
-- **proxy.py** - Completely rewritten with:
-  - All module integrations
-  - Secure CORS configuration
-  - Input validation
-  - Authentication on AI endpoints
-  - Usage tracking for billing
-  - Health check endpoint
-
-### **WHAT'S WORKING NOW**
-
-1. ✅ **Multi-User Support** - Multiple users can sign up and use Cursive
-2. ✅ **BYOK** - Users can add their own API keys (or use yours with 15% markup)
-3. ✅ **Rate Limiting** - Protection against abuse
-4. ✅ **Usage Tracking** - All API calls tracked for billing
-5. ✅ **Secure** - Fixed all critical security vulnerabilities
-6. ✅ **Scalable** - Database-backed storage (no more localStorage limits)
-7. ✅ **Monetizable** - Stripe integration ready for subscriptions
-
-### **READY FOR BETA LAUNCH** 🚀
-
-Cursive is now production-ready for a beta launch! All critical Phase 1 & 2 infrastructure is in place.
-
-### **NEXT STEPS** (Optional Enhancements)
-
-- **Phase 3: Code Quality** - Refactor monolithic files, add TypeScript, testing
-- **Phase 4: DevOps** - CI/CD, monitoring, automated backups
-- **Phase 5: Features** - Mobile app, collaboration, templates
-
-See full roadmap details below.
+**Target Users:** Students (K-12), children (with parent guidance), and teachers
+**Current Status:** ✅ Phase 1 (Core Canvas) Complete! Phase 2 (Educational Features) in progress.
 
 ---
 
-## 🚀 Build Commands
+## 🎯 Core Values
 
-### Development
-```bash
-python proxy.py              # Run Flask dev server on port 5022
-```
+Cursive is **NOT** a productivity tool for adults. It is an **educational tool** designed around five core values:
 
-### Production
-```bash
-gunicorn wsgi:app --bind 0.0.0.0:5022 --workers 4
-```
+1. **Handwriting as Human Experience** - Both human AND AI write with actual strokes (not typed text)
+2. **Learning Through Deliberate Practice** - AI acts as Socratic tutor, not answer machine
+3. **Educational Integrity** - Students can export "human-only" work separate from AI help
+4. **Transparent AI** - System prompt is visible; AI is "vizir" (wise counselor)
+5. **Handwriting Literacy** - Legitimizes handwriting/cursive as proper way to engage with AI
 
-### Environment Setup
-```bash
-# Quick setup (recommended)
-python setup.py              # Creates .env with generated keys
-# Edit .env to add your API keys
-python setup.py --init-db    # Initialize database
-
-# See SETUP.md for detailed setup instructions
-```
+**See `REAL_VALUES.md` for complete values documentation.**
 
 ---
 
-## 🏗️ Development Environment
-
-### Backend
-- **Framework:** Flask (Python)
-- **Database:** PostgreSQL with SQLAlchemy ORM
-- **Cache/Sessions:** Redis (optional, falls back to filesystem)
-- **Authentication:** Flask-Login with JWT support
-- **Rate Limiting:** Flask-Limiter with Redis backend
-- **Billing:** Stripe integration
-- **Production Server:** Gunicorn (WSGI)
-- **AI SDK:** Anthropic Python SDK
-- **Environment:** python-dotenv for config
+## 🏗️ Technology Stack
 
 ### Frontend
-- **Architecture:** Vanilla JavaScript ES6 modules (no build step)
-- **Canvas:** HTML5 Canvas API with pointer events
-- **Storage:** REST API + PostgreSQL (with localStorage fallback for legacy support)
-- **Exports:** jsPDF, FileSaver.js
+- **Framework:** Next.js 15 (App Router) + React 18 + TypeScript
+- **Styling:** Tailwind CSS 4
+- **Canvas:** HTML5 Canvas + perfect-freehand library
+- **State Management:** React hooks (useState, useEffect, useReducer)
+- **Deployment:** Vercel
 
-### Configuration
-- API key: `.env` file (CLAUDE_API_KEY)
-- App config: `static/config/config.yaml`
-- Version management: `static/js/version.js`
+### Backend
+- **Database:** PostgreSQL 15 (via Supabase)
+- **Authentication:** Supabase Auth (email/password + OAuth)
+- **Storage:** Supabase Storage (for exports, shared notebooks)
+- **Edge Functions:** Supabase Edge Functions (Claude API proxy)
+- **Billing:** Stripe (usage-based + subscriptions)
 
----
-
-## 📊 Code Review Summary
-
-### ✅ STRENGTHS (5 Pros)
-
-1. **Unique UX** - Handwriting-to-AI pipeline is innovative and well-executed
-2. **Solid Architecture** - Clean module separation, streaming API, good state management
-3. **Thoughtful Details** - Palm rejection, pressure sensitivity, visual feedback animations
-4. **Extensible** - Plugin system is well-designed
-5. **Production-Ready Deploy** - WSGI, CORS, version management in place
-
-### ⚠️ WEAKNESSES (5 Cons)
-
-1. **Security Vulnerabilities**
-   - No authentication/authorization
-   - CORS wildcard (`*` in proxy.py:97, 121)
-   - No input sanitization
-   - Single API key for all users
-
-2. **No User/Billing System**
-   - Can't monetize (no way to charge users)
-   - No usage tracking or limits
-   - API costs uncontrolled
-
-3. **Code Quality Issues**
-   - Large monolithic files (app.js: 1825 lines, canvasManager.js: 1639 lines)
-   - Magic numbers throughout
-   - Dead code (aiService.js:158-165)
-   - Inconsistent error handling
-
-4. **Limited Scalability**
-   - LocalStorage only (no database)
-   - File system storage grows unbounded
-   - No cleanup mechanisms
-   - Synchronous save operations
-
-5. **Missing Modern Practices**
-   - No build system
-   - No TypeScript
-   - No automated tests
-   - No CI/CD
-   - No monitoring/observability
+### AI
+- **Provider:** Anthropic Claude (Sonnet 4.5)
+- **Features:** Vision API (OCR), streaming responses, custom prompts
+- **Routing:** User's own API key (BYOK) OR server key with billing
 
 ---
 
-## 🎯 Current Status
+## 🚀 Quick Start
 
-### What Works ✅
-- Drawing with pressure sensitivity
-- Handwriting OCR via Claude Vision
-- Conversational AI with streaming responses
-- Export to PDF, JSON, shareable URLs
-- Plugin system (5 built-in plugins)
-- Dark/light theme switching
+### Development
 
-### Critical Blockers for Launch 🚨
+```bash
+# 1. Install dependencies
+npm install
 
-**CANNOT launch publicly without:**
+# 2. Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your Supabase and Anthropic API keys
 
-1. **User Authentication** - Anyone can use your API key right now
-2. **Rate Limiting** - No protection against abuse or runaway costs
-3. **Database** - LocalStorage doesn't work for multi-user
-4. **Billing System** - Can't charge users or track usage
-5. **Security Fixes** - CORS, input sanitization, session management
+# 3. Run development server
+npm run dev
 
----
+# 4. Open http://localhost:3000
+```
 
-## 🛠️ Next Steps: Modernization Roadmap
+### Environment Variables
 
-### PHASE 1: Security & User Management (CRITICAL)
-**Timeline:** 2-3 weeks | **Priority:** MUST DO BEFORE LAUNCH
+Required in `.env.local`:
 
-#### Tasks:
-- [ ] Implement authentication system
-  - Use Auth0, Clerk, or NextAuth.js
-  - Support email/password and OAuth (Google, GitHub)
-  - Create user database schema
+```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-- [ ] Add API key management
-  - BYOK option: Let users provide their own Anthropic key
-  - Store encrypted keys per user (use cryptography library)
-  - Add settings UI for key management
+# Anthropic (server-side only)
+ANTHROPIC_API_KEY=sk-ant-your-key-here
 
-- [ ] Create billing system
-  - Integrate Stripe for payments
-  - Track API usage per user (store in database)
-  - Implement usage quotas and metering
-  - Calculate costs: `(Anthropic_cost × 1.15) + base_subscription`
+# Stripe (optional, for billing)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+```
 
-- [ ] Add rate limiting
-  - Use Redis for distributed rate limiting
-  - Set limits: 50 requests/minute per user, 500/day
-  - Add graceful degradation with clear error messages
+### Database Setup
 
-- [ ] Fix security issues
-  - Remove CORS wildcard, use specific allowed origins
-  - Add input validation (max length, character allowlist)
-  - Implement CSRF protection
-  - Add secure session management (httpOnly cookies)
-  - Sanitize all user inputs before storage
+```bash
+# 1. Create Supabase project at https://supabase.com
 
-**Files to modify:**
-- `proxy.py` - Add auth middleware, rate limiting, input validation
-- Create new: `auth.py`, `billing.py`, `rate_limiter.py`
-- Frontend: Add login/signup pages, settings page
+# 2. Apply schema
+# Copy contents of database/UNIFIED_SCHEMA.sql
+# Paste into Supabase Dashboard > SQL Editor > Run
 
----
+# 3. Enable Email Auth
+# Go to Supabase Dashboard > Authentication > Providers
+# Enable "Email" provider
 
-### PHASE 2: Database & Scalability (HIGH PRIORITY)
-**Timeline:** 2 weeks | **Priority:** Required for multi-user
-
-#### Tasks:
-- [ ] Set up PostgreSQL database
-  ```sql
-  Tables needed:
-  - users (id, email, encrypted_api_key, subscription_tier, created_at)
-  - notebooks (id, user_id, title, created_at, updated_at)
-  - drawings (id, notebook_id, stroke_data, timestamp)
-  - api_usage (id, user_id, tokens_used, cost, timestamp)
-  - billing (id, user_id, stripe_customer_id, subscription_status)
-  ```
-
-- [ ] Set up Redis
-  - Session storage
-  - Rate limiting counters
-  - Cache frequently accessed data
-
-- [ ] Migrate localStorage to backend storage
-  - Create REST API for drawings CRUD
-  - Update dataManager.js to use API instead of localStorage
-  - Add pagination for large notebooks
-
-- [ ] Implement cleanup mechanisms
-  - Scheduled job to archive old pages
-  - S3/CloudFlare R2 for drawing storage (Canvas images)
-  - Compression for stroke data
-
-**Files to modify:**
-- Create new: `database.py`, `models.py`, `api_routes.py`
-- `dataManager.js` - Replace localStorage with fetch() API calls
-- `proxy.py` - Add database connection, ORM (SQLAlchemy)
-
----
-
-### PHASE 3: Code Quality (MEDIUM PRIORITY)
-**Timeline:** 1-2 weeks | **Priority:** Improves maintainability
-
-#### Tasks:
-- [ ] Break down monolithic files
-  ```javascript
-  app.js (1825 lines) → split into:
-    - app.js (init, event handlers)
-    - chatHandler.js (chat logic)
-    - exportHandler.js (PDF, JSON exports)
-    - modalManager.js (modal interactions)
-    - themeManager.js (dark/light theme)
-
-  canvasManager.js (1639 lines) → split into:
-    - canvasManager.js (init, core rendering)
-    - drawingManager.js (stroke handling)
-    - selectionManager.js (selection logic)
-    - zoomPanManager.js (viewport controls)
-    - touchHandler.js (touch/stylus events)
-  ```
-
-- [ ] Add TypeScript
-  - Install TypeScript, set up tsconfig.json
-  - Gradually migrate modules starting with utils
-  - Define interfaces for Stroke, NotebookItem, Drawing, etc.
-
-- [ ] Set up build system
-  - Use Vite (fast, modern, great DX)
-  - Configure for production builds with minification
-  - Set up environment-based config (dev/staging/prod)
-
-- [ ] Add testing
-  - Unit tests: Vitest for JS/TS modules
-  - Integration tests: Playwright for E2E flows
-  - Target 70%+ coverage on critical paths
-
-- [ ] Improve error handling
-  - Create centralized error handler
-  - Replace alerts with toast notifications
-  - Log errors to backend for monitoring
-
-**Files to create:**
-- `package.json`, `tsconfig.json`, `vite.config.ts`
-- `tests/` directory with unit and E2E tests
-
----
-
-### PHASE 4: DevOps & Monitoring (MEDIUM PRIORITY)
-**Timeline:** 1 week | **Priority:** Required for production
-
-#### Tasks:
-- [ ] Set up CI/CD
-  - GitHub Actions for automated testing
-  - Auto-deploy to staging on merge to `main`
-  - Manual approval for production deploys
-
-- [ ] Add monitoring
-  - **Error tracking:** Sentry for frontend and backend errors
-  - **Metrics:** Datadog or New Relic for performance monitoring
-  - **Logs:** CloudWatch or ELK stack for log aggregation
-  - **Uptime:** UptimeRobot or Pingdom
-
-- [ ] Create staging environment
-  - Separate database, API keys, domain
-  - Use staging for QA before production
-
-- [ ] Implement health checks
-  ```python
-  @app.route('/health')
-  def health_check():
-      return {'status': 'ok', 'database': check_db(), 'redis': check_redis()}
-  ```
-
-- [ ] Set up backups
-  - Daily PostgreSQL backups to S3
-  - Retention policy: 30 days
-  - Test restore procedure monthly
-
-**Files to create:**
-- `.github/workflows/ci.yml`, `deploy.yml`
-- `docker-compose.yml` for local multi-service setup
-- `monitoring/` directory with alerting rules
-
----
-
-## 💰 Monetization Strategy
-
-Based on your requirements (BYOK or 15% fee), here's the recommended approach:
-
-### Hybrid Model (Best of Both Worlds)
-
-**Tier 1: Free (BYOK)**
-- User provides own Anthropic API key
-- No usage limits
-- Basic features only
-- No support
-
-**Tier 2: Pro ($9/month)**
-- We provide API access (no key needed)
-- 50,000 tokens included
-- $0.02 per 1K tokens after (15% markup on Anthropic pricing)
-- Priority support
-- Advanced features (templates, collaboration, etc.)
-
-**Tier 3: Enterprise (Custom pricing)**
-- Dedicated support
-- Custom integrations
-- SLA guarantees
-- Volume discounts
-
-### Implementation Steps:
-
-1. **Add Stripe integration**
-   ```python
-   # billing.py
-   import stripe
-   stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-
-   def create_subscription(user_id, price_id):
-       # Create customer, attach payment method, subscribe
-
-   def track_usage(user_id, tokens_used):
-       # Increment usage counter for billing
-   ```
-
-2. **Track API usage**
-   ```python
-   # Middleware to count tokens
-   @app.before_request
-   def track_api_usage():
-       if request.path.startswith('/api/claude'):
-           # Log tokens used, calculate cost
-           # Store in database for billing
-   ```
-
-3. **Add settings page**
-   - Option to add own API key (BYOK)
-   - View current usage and costs
-   - Upgrade/downgrade subscription
-   - Billing history
-
----
-
-## 🎨 Code Style Guidelines
-
-### Python
-- **Style:** PEP 8
-- **Indentation:** 4 spaces
-- **Docstrings:** Google style
-- **Type hints:** Use for all function signatures
-- **Example:**
-  ```python
-  def create_user(email: str, password: str) -> User:
-      """Create a new user account.
-
-      Args:
-          email: User's email address
-          password: Plain text password (will be hashed)
-
-      Returns:
-          User object with generated ID
-
-      Raises:
-          ValueError: If email already exists
-      """
-      # Implementation
-  ```
-
-### JavaScript/TypeScript
-- **Indentation:** 2 spaces
-- **Naming:** camelCase for variables/functions
-- **Constants:** UPPER_SNAKE_CASE
-- **Example:**
-  ```typescript
-  async function sendToAI(prompt: string): Promise<string> {
-    try {
-      const response = await fetch('/api/claude', {
-        method: 'POST',
-        body: JSON.stringify({ prompt })
-      });
-      return await response.json();
-    } catch (error) {
-      logError('AI request failed', error);
-      throw error;
-    }
-  }
-  ```
-
-### Error Handling
-- Always use try/catch for async operations
-- Log errors to console AND backend
-- Show user-friendly messages (not raw errors)
-- Example:
-  ```javascript
-  try {
-    await riskyOperation();
-  } catch (error) {
-    console.error('Operation failed:', error);
-    logToBackend('riskyOperation', error);
-    showToast('Something went wrong. Please try again.');
-  }
-  ```
+# Done! Database is ready.
+```
 
 ---
 
@@ -515,309 +106,324 @@ Based on your requirements (BYOK or 15% fee), here's the recommended approach:
 
 ```
 Cursive/
-├── proxy.py                    # Flask backend (main app)
-├── wsgi.py                     # Production WSGI entry
-├── requirements.txt            # Python dependencies
-├── .env                        # API keys (gitignored)
-├── auth.py                     # [TO ADD] Authentication logic
-├── billing.py                  # [TO ADD] Stripe integration
-├── database.py                 # [TO ADD] DB connection
-├── models.py                   # [TO ADD] SQLAlchemy models
+├── app/                        # Next.js App Router
+│   ├── layout.tsx              # Root layout with providers
+│   ├── page.tsx                # Main canvas page
+│   ├── globals.css             # Tailwind styles
+│   └── api/                    # API routes
+│       └── claude/
+│           └── route.ts        # Claude AI proxy endpoint
 │
-├── static/
-│   ├── css/
-│   │   └── styles.css          # Main stylesheet
-│   ├── js/
-│   │   ├── app.js              # Main app (1825 lines - NEEDS REFACTOR)
-│   │   ├── canvasManager.js    # Canvas logic (1639 lines - NEEDS REFACTOR)
-│   │   ├── aiService.js        # Claude API client
-│   │   ├── dataManager.js      # Storage (localStorage → API)
-│   │   ├── handwritingSimulation.js  # Font rendering
-│   │   ├── pluginManager.js    # Plugin system
-│   │   ├── promptManager.js    # Prompt handling
-│   │   ├── config.js           # Config loader
-│   │   ├── version.js          # Cache busting
-│   │   └── plugins/
-│   │       ├── index.js
-│   │       ├── calculatorPlugin.js
-│   │       ├── ocrPlugin.js
-│   │       ├── shapeToolsPlugin.js
-│   │       ├── colorPickerPlugin.js
-│   │       └── templatesPlugin.js
-│   └── config/
-│       └── config.yaml         # App configuration
+├── components/                 # React Components
+│   ├── Canvas.tsx              # Main drawing canvas
+│   ├── Toolbar.tsx             # Toolbar (tools, export, etc.)
+│   └── ChatPanel.tsx           # AI conversation UI
 │
-├── templates/
-│   └── index.html              # Main page template
+├── lib/                        # Utilities
+│   ├── types.ts                # TypeScript interfaces
+│   ├── ai.ts                   # Claude API client
+│   ├── handwriting.ts          # Handwriting simulation
+│   ├── export.ts               # PDF/JSON export
+│   ├── auth.ts                 # Supabase auth functions
+│   ├── supabase.ts             # Supabase client
+│   └── constants.ts            # App constants
 │
-├── pages/                      # User-generated shareable pages
-│   └── [uuid]/
-│       └── data.json
+├── hooks/                      # React Hooks
+│   └── useCanvas.ts            # Canvas state management
 │
-└── [TO ADD]
-    ├── tests/                  # Test suite
-    ├── docker-compose.yml      # Local dev environment
-    ├── .github/workflows/      # CI/CD pipelines
-    └── monitoring/             # Alerting rules
+├── database/                   # Database Schema
+│   ├── UNIFIED_SCHEMA.sql      # ⭐ CANONICAL DATABASE SCHEMA
+│   └── SCHEMA_README.md        # Schema documentation
+│
+├── supabase/                   # Supabase Config
+│   └── migrations/             # Database migrations
+│
+├── legacy-static-site/         # 🗄️ OLD Flask app (archived)
+│   └── ...                     # DO NOT USE - kept for reference
+│
+└── Documentation
+    ├── REAL_VALUES.md          # ⭐ Core values & vision
+    ├── CURRENT_STATUS.md       # Implementation status
+    ├── SETUP.md                # Deployment guide
+    └── VX_AUDIT_REPORT.md      # Values audit
 ```
 
 ---
 
-## 🔑 Key Components
+## ✅ What's Implemented
 
-### Backend (proxy.py)
-**Lines 1-241**
-- Flask app setup with CORS
-- `/api/claude` - Non-streaming AI requests
-- `/api/claude/stream` - Streaming AI responses
-- `/api/save-to-web` - Generate shareable page URLs
-- `serve_page()` - Serve saved pages with data
+### Phase 1: Core Canvas (Complete)
+- ✅ Pressure-sensitive drawing with perfect-freehand
+- ✅ Palm rejection for stylus input
+- ✅ Infinite canvas with pan and zoom
+- ✅ Undo/redo with history stack
+- ✅ Selection tool with visual feedback
+- ✅ OCR via Claude Vision API
+- ✅ Streaming AI responses
+- ✅ Export to PDF and JSON
+- ✅ Dark/light theme
 
-**Security Issues (TO FIX):**
-- Line 19: CORS allows single origin (good), but line 97/121 use wildcard (bad)
-- Line 32-64: No authentication on /api/claude endpoint
-- Line 128-140: Page IDs not sanitized before file system access
+### Phase 1.5: Infrastructure (Complete)
+- ✅ Supabase authentication (backend only)
+- ✅ PostgreSQL database with RLS
+- ✅ Next.js + TypeScript architecture
+- ✅ Unified database schema
+- ✅ API usage tracking
 
-### Frontend Modules
+### What's Missing (Phase 2 - In Progress)
 
-**app.js** (1825 lines)
-- Main application initialization
-- Event handlers for toolbar buttons
-- Chat handling (typed and handwritten)
-- Modal management
-- Export functionality (PDF, JSON, web)
-- Plugin system initialization
+#### Critical for Educational Use:
+- ❌ **Login/Signup UI** - Auth backend exists, but no user-facing forms
+- ❌ **Hide/Show AI Responses toggle** - Students can't export clean work yet
+- ❌ **Visual distinction between student and AI strokes** - Everything looks the same
+- ❌ **Tutor-mode system prompt** - AI gives answers instead of asking questions
+- ❌ **System prompt visibility** - Parents/teachers can't see how AI is instructed
 
-**canvasManager.js** (1639 lines)
-- Canvas initialization and resizing
-- Drawing with pressure sensitivity
-- Touch handling with palm rejection
-- Selection rectangle with visual feedback
-- Pan and zoom functionality
-- Undo/redo stack management
-- Text overlay rendering
+#### Nice to Have:
+- ❌ User menu (profile, settings, logout)
+- ❌ Handwriting training UI (types exist, UI doesn't)
+- ❌ AI stroke generation (currently uses SVG fonts)
+- ❌ Plugin system (calculator, OCR, shapes from legacy app)
+- ❌ Kid-friendly onboarding
 
-**aiService.js** (166 lines)
-- `sendImageToAI()` - OCR via Claude Vision
-- `sendChatToAI()` - Chat with streaming support
-- Response parsing
+---
 
-**dataManager.js**
-- LocalStorage CRUD for notebooks
-- Import/export JSON
-- Drawing persistence
-- Save to web (generate shareable URLs)
+## 🎓 Educational Features (Priority)
 
-**handwritingSimulation.js**
-- Simulated handwriting rendering
-- Multiple font styles (cursive, neat, print, messy)
-- Character-by-character variation
+These features enable Cursive's educational mission:
 
-**pluginManager.js**
-- Plugin registration and lifecycle
-- Toolbar rendering
-- Plugin state management
+### 1. Hide/Show AI Responses
+**Status:** Not implemented
+**Why Critical:** Students need to show teachers "human-only" work without AI assistance visible.
+
+**Implementation needed:**
+- Toggle in toolbar to hide/show AI strokes
+- Filter `drawings` where `is_ai_generated = TRUE`
+- Persist preference in `user_settings.hide_ai_responses`
+- Export options: "Include AI?" checkbox
+
+### 2. Tutor-Mode System Prompt
+**Status:** Not implemented
+**Why Critical:** Current AI gives direct answers, which defeats learning.
+
+**Example prompt needed:**
+```
+You are a wise tutor (a "vizir") helping a student learn through handwriting.
+
+Your role is to:
+- Ask thoughtful questions that encourage deeper thinking
+- Suggest drawing or diagramming to visualize ideas
+- Be patient and exploratory, not rushed or answer-focused
+- Help them discover insights themselves, don't just provide answers
+- Celebrate their thinking process, not just correct answers
+
+Remember: This student is writing by hand to learn deliberately.
+Respect the slowness and thoughtfulness of handwriting.
+```
+
+**File to update:** `app/api/claude/route.ts`
+
+### 3. Visual Distinction for AI Strokes
+**Status:** Not implemented
+**Why Critical:** Students need to see what they wrote vs. what AI wrote.
+
+**Options:**
+- Different color (e.g., AI in blue, human in black)
+- Label overlay: "Your writing" vs. "Claude's response"
+- Layer system with opacity control
+
+---
+
+## 🔑 Key Files to Know
+
+### Canvas Rendering
+- **`components/Canvas.tsx`** (Primary) - Main canvas component, handles drawing, selection, rendering
+- **`hooks/useCanvas.ts`** - Canvas state management with useReducer
+- **`lib/types.ts`** - TypeScript interfaces for Stroke, Point, CanvasState
+
+### AI Integration
+- **`app/api/claude/route.ts`** - Claude API proxy with streaming support
+- **`lib/ai.ts`** - Client-side AI service (calls /api/claude)
+- **`lib/handwriting.ts`** - Simulated handwriting rendering (SVG paths)
+
+### Authentication
+- **`lib/auth.ts`** - Supabase auth functions (signUp, signIn, signOut)
+- **`lib/supabase.ts`** - Supabase client initialization
+- Note: **NO UI COMPONENTS** exist for login/signup yet!
+
+### Data Persistence
+- **`database/UNIFIED_SCHEMA.sql`** - Canonical database schema (UUID, RLS policies)
+- Supabase tables: notebooks, drawings, user_handwriting, api_usage, user_settings
+
+---
+
+## 🛠️ Development Guidelines
+
+### Adding New Features
+
+When implementing new features:
+
+1. **Start with values** - Check `REAL_VALUES.md` to ensure alignment
+2. **Update types** - Add to `lib/types.ts` if needed
+3. **Add to Canvas state** - Update `useCanvas.ts` if canvas-related
+4. **Test with keyboard AND stylus** - Ensure both input methods work
+5. **Consider educational use** - Will kids/students understand this?
+
+### Code Style
+
+#### TypeScript
+```typescript
+// Use interfaces for data structures
+export interface Stroke {
+  points: Point[];
+  color: string;
+  width: number;
+}
+
+// Use type for unions
+export type Tool = 'draw' | 'select' | 'pan' | 'zoom';
+
+// Always type function parameters and return values
+async function transcribeDrawing(imageData: ImageData): Promise<string> {
+  // ...
+}
+```
+
+#### React Components
+```tsx
+// Use functional components with TypeScript
+interface CanvasProps {
+  width: number;
+  height: number;
+  onStrokeComplete?: (stroke: Stroke) => void;
+}
+
+export function Canvas({ width, height, onStrokeComplete }: CanvasProps) {
+  // Implementation
+}
+```
+
+#### File Organization
+- **One component per file** (Canvas.tsx contains Canvas component)
+- **Group related utilities** (handwriting.ts, emotionalHandwriting.ts)
+- **Separate types** (lib/types.ts for shared interfaces)
+
+### Error Handling
+```typescript
+try {
+  await riskyOperation();
+} catch (error) {
+  console.error('Operation failed:', error);
+  // Show user-friendly error to user
+  toast.error('Something went wrong. Please try again.');
+}
+```
 
 ---
 
 ## 🐛 Known Issues
 
 ### Critical (Fix Before Launch)
-1. **No authentication** - Anyone can use your API key (proxy.py:32)
-2. **No rate limiting** - Vulnerable to abuse
-3. **CORS wildcard** - Security risk (proxy.py:97, 121)
-4. **No input validation** - Injection risks (proxy.py:38-45)
+1. **No authentication UI** - Backend works, but users can't sign up/login
+2. **No hide/show AI toggle** - Students can't export clean work
+3. **Generic AI prompt** - AI gives answers instead of asking questions (not pedagogical)
+4. **No visual distinction** - Can't tell student strokes from AI strokes
 
 ### High Priority
-5. **Dead code** - aiService.js:158-165 (downloadImage function)
-6. **Magic numbers** - 200ms, 300ms delays hardcoded everywhere
-7. **Large files** - app.js (1825), canvasManager.js (1639) need splitting
-8. **No error boundaries** - Errors crash entire app
+5. **AI uses SVG simulation** - Not actual stroke generation (violates "Handwriting as Human Experience" value)
+6. **No system prompt visibility** - Parents/teachers can't see how AI is instructed (violates "Transparent AI")
+7. **Documentation outdated** - Multiple docs describe Flask app that doesn't exist
 
 ### Medium Priority
-9. **LocalStorage limits** - Will fail with large notebooks
-10. **No cleanup** - pages/ folder grows indefinitely
-11. **Synchronous saves** - Can block UI
-12. **Inconsistent error handling** - Mix of alerts and console.error
+8. **No user menu** - Can't access profile, settings, or logout
+9. **No handwriting training UI** - Backend ready, frontend missing
+10. **Large component files** - Canvas.tsx and useCanvas.ts are getting complex
 
 ---
 
-## 🚨 Critical Security Issues (MUST FIX)
+## 🎯 Current Development Priorities
 
-### 1. API Key Exposure
-**File:** `proxy.py:24-30`
-**Issue:** Single server-side key used for all users
-**Impact:** You pay for everyone's API usage, no way to bill users
-**Fix:**
-```python
-# Add per-user key storage
-def get_api_key(user_id):
-    user = db.session.query(User).get(user_id)
-    if user.api_key:
-        return decrypt(user.api_key)  # User's own key
-    else:
-        track_usage(user_id)  # Track for billing
-        return os.getenv('CLAUDE_API_KEY')  # Your key with fee
-```
+### Priority 1: Authentication UI ⚡
+**Timeline:** 1-2 days
+**Impact:** CRITICAL - Blocks all multi-user features
 
-### 2. No Rate Limiting
-**File:** `proxy.py:32-64`
-**Issue:** Unlimited API calls per user/IP
-**Impact:** Abuse, runaway costs
-**Fix:**
-```python
-from flask_limiter import Limiter
-limiter = Limiter(app, key_func=get_remote_address)
+**Tasks:**
+- Create `components/AuthModal.tsx` (login/signup forms)
+- Add to `app/layout.tsx` or `app/page.tsx`
+- Create `components/UserMenu.tsx` (profile, settings, logout)
+- Add middleware for protected routes
 
-@limiter.limit("50/minute")
-@app.route('/api/claude', methods=['POST'])
-def handle_claude_request():
-    # ...
-```
+### Priority 2: Educational Integrity Features ⚡
+**Timeline:** 2-3 days
+**Impact:** HIGH - Required for students to use Cursive for schoolwork
 
-### 3. CORS Wildcard
-**File:** `proxy.py:97, 121`
-**Issue:** `Access-Control-Allow-Origin: *` allows any domain
-**Impact:** CSRF attacks, data theft
-**Fix:**
-```python
-ALLOWED_ORIGINS = ['https://yourdomain.com', 'https://app.yourdomain.com']
+**Tasks:**
+- Implement "Hide/Show AI Responses" toggle in Toolbar
+- Update `lib/export.ts` to support "human-only" PDF export
+- Add visual distinction (color or label) for AI strokes
+- Update `database/UNIFIED_SCHEMA.sql` if needed (already has `is_ai_generated`)
 
-def build_actual_response(response, status=200):
-    origin = request.headers.get('Origin')
-    if origin in ALLOWED_ORIGINS:
-        response.headers.add("Access-Control-Allow-Origin", origin)
-    return response, status
-```
+### Priority 3: Tutor-Mode System Prompt ⚡
+**Timeline:** 4-6 hours
+**Impact:** HIGH - Core to learning value proposition
 
-### 4. No Input Validation
-**File:** `proxy.py:38-45`
-**Issue:** User data sent directly to API without validation
-**Impact:** Injection attacks, DoS
-**Fix:**
-```python
-from marshmallow import Schema, fields, ValidationError
+**Tasks:**
+- Update system prompt in `app/api/claude/route.ts`
+- Test with sample student queries (math, essay questions, etc.)
+- Create Settings page to display prompt (transparency value)
+- Document prompt in `REAL_VALUES.md`
 
-class ClaudeRequestSchema(Schema):
-    model = fields.Str(required=True, validate=lambda x: x in ALLOWED_MODELS)
-    max_tokens = fields.Int(required=True, validate=lambda x: 1 <= x <= 4096)
-    messages = fields.List(fields.Dict(), required=True, validate=lambda x: len(x) <= 100)
+### Priority 4: Documentation Update
+**Timeline:** 2-3 hours
+**Impact:** MEDIUM - Prevents confusion for new developers
 
-@app.route('/api/claude', methods=['POST'])
-def handle_claude_request():
-    try:
-        data = ClaudeRequestSchema().load(request.get_json())
-    except ValidationError as e:
-        return jsonify({"error": "Invalid request", "details": e.messages}), 400
-    # ...
-```
-
-### 5. Path Traversal Risk
-**File:** `proxy.py:145-161`
-**Issue:** User-provided page_id used in file path without sanitization
-**Impact:** Directory traversal, file system access
-**Fix:**
-```python
-import re
-
-@app.route('/pages/<page_id>')
-def serve_page(page_id=None):
-    if page_id:
-        # Sanitize: only allow alphanumeric and hyphens
-        if not re.match(r'^[a-zA-Z0-9-]+$', page_id):
-            return "Invalid page ID", 400
-
-        page_path = os.path.join(base_dir, 'pages', page_id, 'data.json')
-        # Ensure path is within pages directory
-        if not os.path.abspath(page_path).startswith(os.path.join(base_dir, 'pages')):
-            return "Invalid page ID", 400
-        # ...
-```
+**Tasks:**
+- ✅ Update CLAUDE.md (this file) - DONE
+- Update SETUP.md with Next.js instructions
+- Update README.md for educational positioning
+- Archive legacy Flask documentation
 
 ---
 
-## 📝 Development Workflow
+## 🚫 Anti-Patterns (What NOT to Do)
 
-### Before Starting Work
-1. Pull latest: `git pull origin main`
-2. Create feature branch: `git checkout -b feature/your-feature`
-3. Update dependencies: `pip install -r requirements.txt`
+### ❌ Don't Build for Adults First
+Cursive is for students/kids. If you design for adult productivity, you'll get the UX wrong.
 
-### During Development
-- Run dev server: `python proxy.py`
-- Check logs for errors
-- Test in multiple browsers (Chrome, Safari, Firefox)
-- Test on tablet if working on canvas/touch features
+### ❌ Don't Make AI Give Direct Answers
+AI should ask Socratic questions, not provide solutions. This is core to learning value.
 
-### Before Committing
-- [ ] Code follows style guidelines
-- [ ] No console.log() statements left in
-- [ ] Error handling added for new code
-- [ ] Comments added for complex logic
-- [ ] Tested manually
-- [ ] No breaking changes to existing features
+### ❌ Don't Hide the System Prompt
+Transparency is a core value. Parents/teachers should see how AI is instructed.
 
-### Commit Message Format
-```
-type(scope): brief description
+### ❌ Don't Mix Student and AI Work
+Students must be able to export "clean" human-only work. Always track `is_ai_generated`.
 
-Longer description if needed
+### ❌ Don't Add Gamification
+No points, badges, streaks, or social features. This is a learning tool, not engagement optimization.
 
-- Bullet points for key changes
-- Reference issues: Fixes #123
-```
-
-Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
+### ❌ Don't Use PUBLIC.USERS Table
+Supabase Auth provides `auth.users`. Never create a duplicate `public.users` table.
 
 ---
 
-## 🧪 Testing Guidelines
+## 📚 Additional Documentation
 
-### Manual Testing Checklist
-- [ ] Drawing works with mouse and touch
-- [ ] Selection → transcription → AI response flow
-- [ ] Export to PDF includes all content
-- [ ] Dark/light theme switches properly
-- [ ] Plugin toolbar renders correctly
-- [ ] Undo/redo works as expected
-- [ ] Pan and zoom feel smooth
-- [ ] Shareable URLs load correctly
-
-### Automated Testing (TO ADD)
-```javascript
-// tests/canvas.test.ts
-describe('Canvas Manager', () => {
-  test('should initialize canvas with correct dimensions', () => {
-    // ...
-  });
-
-  test('should handle touch events with palm rejection', () => {
-    // ...
-  });
-});
-```
+- **`REAL_VALUES.md`** - ⭐ Core values, user scenarios, implementation priorities
+- **`CURRENT_STATUS.md`** - What's built vs. what's missing
+- **`VX_AUDIT_REPORT.md`** - Values-through-code audit
+- **`database/SCHEMA_README.md`** - Database schema documentation
+- **`SETUP.md`** - Deployment and configuration guide
 
 ---
 
-## ⚠️ Pre-Launch Checklist
+## 💬 Need Help?
 
-**DO NOT DEPLOY TO PRODUCTION UNTIL:**
-
-- [ ] User authentication implemented
-- [ ] Rate limiting added
-- [ ] Database set up (PostgreSQL + Redis)
-- [ ] Billing system integrated (Stripe)
-- [ ] All security issues fixed
-- [ ] CORS wildcard removed
-- [ ] Input validation added
-- [ ] Error tracking set up (Sentry)
-- [ ] Monitoring configured (Datadog/New Relic)
-- [ ] Backups automated
-- [ ] Privacy policy and ToS written
-- [ ] Beta testing completed with 10+ users
-- [ ] Load testing completed
-- [ ] Customer support process defined
+- **Database questions:** See `database/SCHEMA_README.md`
+- **Values questions:** See `REAL_VALUES.md`
+- **Setup questions:** See `SETUP.md`
+- **Current status:** See `CURRENT_STATUS.md`
 
 ---
 
-**IMPORTANT:** This context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.
+**Remember:** Cursive is an educational tool for kids and students, not a productivity tool for adults. Every feature should serve learning, not efficiency.

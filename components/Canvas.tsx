@@ -89,8 +89,12 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       });
     }
 
-    // Draw text overlays
-    state.textOverlays.forEach(overlay => {
+    // Draw text overlays (filter AI responses if hideAIResponses is true)
+    const visibleOverlays = state.hideAIResponses
+      ? state.textOverlays.filter(overlay => !overlay.isAI)
+      : state.textOverlays;
+
+    visibleOverlays.forEach(overlay => {
       drawTextOverlay(ctx, overlay);
     });
 
@@ -380,7 +384,8 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
               width: canvas.width - 100,
               fontSize: 24,
               color: '#4338ca', // indigo-700 for AI responses
-              timestamp: Date.now()
+              timestamp: Date.now(),
+              isAI: true  // Mark as AI-generated for hide/show toggle
             };
             actions.addTextOverlay(overlay);
 

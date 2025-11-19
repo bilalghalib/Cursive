@@ -36,6 +36,9 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
 
+  // Educational integrity state
+  const [hideAIResponses, setHideAIResponses] = useState<boolean>(false);
+
   // Training mode state
   const [typographyGuides, setTypographyGuides] = useState<TypographyGuides>({
     enabled: false,
@@ -196,6 +199,11 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
 
     clearTextOverlays: useCallback(() => {
       setTextOverlays([]);
+    }, []),
+
+    // Educational integrity actions
+    toggleHideAIResponses: useCallback(() => {
+      setHideAIResponses(prev => !prev);
     }, []),
 
     // Typography & Training actions
@@ -389,6 +397,7 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
     selectionRect,
     chatHistory,
     textOverlays,
+    hideAIResponses,
     typographyGuides,
     trainingMode,
     undoStack,
