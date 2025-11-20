@@ -177,6 +177,44 @@ export const API = {
   DEFAULT_MODEL: 'claude-3-5-sonnet-20241022',
 } as const;
 
+export const PAGE = {
+  /** A4 dimensions in pixels at 96 DPI */
+  A4_WIDTH: 794,
+  A4_HEIGHT: 1123,
+  A4_ASPECT_RATIO: 1.414, // √2
+
+  /** Letter dimensions in pixels at 96 DPI */
+  LETTER_WIDTH: 816,
+  LETTER_HEIGHT: 1056,
+  LETTER_ASPECT_RATIO: 1.294,
+
+  /** A5 dimensions in pixels at 96 DPI */
+  A5_WIDTH: 559,
+  A5_HEIGHT: 794,
+  A5_ASPECT_RATIO: 1.414, // √2
+
+  /** Default page size */
+  DEFAULT_SIZE: 'A4' as const,
+
+  /** Default page orientation */
+  DEFAULT_ORIENTATION: 'portrait' as const,
+
+  /** Default page background color */
+  DEFAULT_BACKGROUND: '#ffffff',
+
+  /** Page border color (subtle guide) */
+  BORDER_COLOR: '#e5e7eb',
+
+  /** Page shadow color */
+  SHADOW_COLOR: 'rgba(0, 0, 0, 0.1)',
+
+  /** Padding around page (px) */
+  PAGE_PADDING: 40,
+
+  /** Minimum space between AI response and existing content (px) */
+  MIN_RESPONSE_SPACING: 30,
+} as const;
+
 export const STORAGE_KEYS = {
   /** LocalStorage key for training data */
   TRAINING_DATA: 'cursive-training-data',

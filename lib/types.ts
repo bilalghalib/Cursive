@@ -22,7 +22,7 @@ export interface Stroke {
   normalized?: boolean;      // Has this been normalized to guides?
 }
 
-export type Tool = 'draw' | 'select' | 'pan' | 'zoom';
+export type Tool = 'draw' | 'select' | 'pan' | 'zoom' | 'lasso';
 
 export interface SelectionRect {
   startX: number;
@@ -66,9 +66,53 @@ export interface TrainingMode {
   style: 'print' | 'cursive'; // Writing style
 }
 
+// Page system (A4-sized pages in notebook)
+export interface Page {
+  id: string;
+  notebookId: string;
+  pageNumber: number;       // 1, 2, 3, etc.
+  size: 'A4' | 'Letter' | 'A5';
+  orientation: 'portrait' | 'landscape';
+  backgroundColor: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Bounding box for spatial calculations
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  type?: 'student_stroke' | 'ai_response' | 'selection';
+}
+
+// Spatial context sent to AI for intelligent response positioning
+export interface SpatialContext {
+  pageSize: {
+    width: number;   // e.g., 794 for A4
+    height: number;  // e.g., 1123 for A4
+  };
+  selectionBounds: BoundingBox;
+  occupiedRectangles: BoundingBox[];  // All existing content on page
+  suggestedResponseY: number;         // Where AI should start writing
+  availableSpaceBelow: number;        // Space between selection and occupied content below
+}
+
+// Lasso selection (closed path with selected strokes)
+export interface LassoSelection {
+  path: Point[];              // The lasso path itself
+  selectedStrokes: number[];  // Indices of strokes within lasso
+  bounds: BoundingBox;        // Bounding box of selection
+}
+
 export interface CanvasState {
   // Tool state
   currentTool: Tool;
+
+  // Page system
+  pages: Page[];
+  currentPageId: string;
 
   // Drawing state
   drawings: Stroke[];
@@ -81,6 +125,7 @@ export interface CanvasState {
 
   // Selection state
   selectionRect: SelectionRect | null;
+  lassoSelection: LassoSelection | null;
 
   // Chat/Conversation state
   chatHistory: ChatMessage[];
@@ -102,16 +147,30 @@ export interface CanvasActions {
   // Tool actions
   setTool: (tool: Tool) => void;
 
+  // Page actions
+  addPage: () => void;
+  deletePage: (pageId: string) => void;
+  goToPage: (pageId: string) => void;
+  nextPage: () => void;
+  previousPage: () => void;
+
   // Drawing actions
   startDrawing: (point: Point) => void;
   continueDrawing: (point: Point) => void;
   finishDrawing: () => void;
 
-  // Selection actions
+  // Selection actions (rectangular)
   startSelection: (x: number, y: number) => void;
   updateSelection: (x: number, y: number) => void;
   finishSelection: () => ImageData | null;
   clearSelection: () => void;
+
+  // Lasso actions
+  startLasso: (point: Point) => void;
+  continueLasso: (point: Point) => void;
+  finishLasso: () => void;
+  clearLasso: () => void;
+  sendLassoToAI: () => Promise<void>;
 
   // Pan actions
   startPan: (x: number, y: number) => void;
