@@ -200,6 +200,9 @@ export function isLassoClosed(path: Point[], threshold: number = 30): boolean {
 /**
  * Find strokes that are completely inside a closed lasso path
  * Uses simplified point-in-polygon algorithm
+ *
+ * For circle gestures: Finds strokes where the CENTER of their bounding box
+ * is inside the circle path
  */
 export function findStrokesInLasso(
   strokes: Stroke[],
@@ -218,6 +221,52 @@ export function findStrokesInLasso(
     };
 
     if (pointInPolygon(center, lassoPath)) {
+      selectedIndices.push(index);
+    }
+  });
+
+  return selectedIndices;
+}
+
+/**
+ * Find strokes inside a circular path
+ * More efficient than generic polygon test for circles
+ *
+ * This is the primary function for circle gesture selection:
+ * "Draw a circle around content → selects what's inside"
+ */
+export function findStrokesInCircle(
+  strokes: Stroke[],
+  circlePath: Point[]
+): number[] {
+  if (circlePath.length < 3) return [];
+
+  // Calculate circle center and radius from path
+  const xs = circlePath.map(p => p.x);
+  const ys = circlePath.map(p => p.y);
+  const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+  // Calculate average distance from center to path points (approximate radius)
+  const distances = circlePath.map(p =>
+    Math.sqrt(Math.pow(p.x - centerX, 2) + Math.pow(p.y - centerY, 2))
+  );
+  const radius = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+
+  const selectedIndices: number[] = [];
+
+  strokes.forEach((stroke, index) => {
+    // Check if stroke's bounding box center is inside circle
+    const bounds = calculateStrokeBounds(stroke);
+    const strokeCenterX = bounds.x + bounds.width / 2;
+    const strokeCenterY = bounds.y + bounds.height / 2;
+
+    const distanceFromCenter = Math.sqrt(
+      Math.pow(strokeCenterX - centerX, 2) +
+      Math.pow(strokeCenterY - centerY, 2)
+    );
+
+    if (distanceFromCenter <= radius) {
       selectedIndices.push(index);
     }
   });

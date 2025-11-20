@@ -1,12 +1,11 @@
 'use client';
 
-import { Sparkles, Move, Trash2, X } from 'lucide-react';
+import { Sparkles, Trash2, X } from 'lucide-react';
 import type { LassoSelection } from '@/lib/types';
 
 interface LassoSelectionUIProps {
   selection: LassoSelection;
   onAskAI: () => void;
-  onMove: () => void;
   onDelete: () => void;
   onClear: () => void;
 }
@@ -14,7 +13,6 @@ interface LassoSelectionUIProps {
 export function LassoSelectionUI({
   selection,
   onAskAI,
-  onMove,
   onDelete,
   onClear
 }: LassoSelectionUIProps) {
@@ -69,15 +67,6 @@ export function LassoSelectionUI({
 
           {/* Divider */}
           <div className="w-px h-6 bg-gray-300" />
-
-          {/* Move button */}
-          <button
-            onClick={onMove}
-            className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-            title="Move selection"
-          >
-            <Move className="w-4 h-4 text-gray-700" />
-          </button>
 
           {/* Delete button */}
           <button
