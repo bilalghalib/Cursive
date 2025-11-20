@@ -180,6 +180,8 @@ export interface CanvasActions {
   continueLasso: (point: Point) => void;
   finishLasso: () => void;
   clearLasso: () => void;
+  setLassoSelection: (selection: LassoSelection | null) => void;
+  setLastAITimestamp: (timestamp: number) => void;
   sendLassoToAI: (includePageIds?: string[]) => Promise<void>;
 
   // Pan actions
