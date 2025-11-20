@@ -2,7 +2,8 @@
  * Gesture Detection
  *
  * Detects gestures from stroke data, specifically:
- * - Fast circles (for "send to AI" command)
+ * - Single fast circle (becomes lasso selection)
+ * - Double fast circle (send all to AI immediately)
  * - Slow circles (regular drawings)
  */
 
@@ -10,7 +11,7 @@ import type { Point } from './types';
 
 export interface GestureResult {
   isGesture: boolean;
-  gestureType: 'circle' | 'none';
+  gestureType: 'circle' | 'double_circle' | 'lasso' | 'none';
   confidence: number; // 0-1
   metadata?: {
     duration?: number;
@@ -18,6 +19,10 @@ export interface GestureResult {
     diameter?: number;
   };
 }
+
+// Store last circle gesture time for double-circle detection
+let lastCircleTimestamp: number = 0;
+const DOUBLE_CIRCLE_WINDOW_MS = 1000; // 1 second window
 
 /**
  * Detect if a stroke is a fast circle gesture
@@ -27,6 +32,11 @@ export interface GestureResult {
  * - Start and end points within 20px
  * - Path length / diameter ratio > 2.5 (ensures it's circular, not just 2 points)
  * - Average speed > 200px/s
+ *
+ * Returns:
+ * - 'double_circle' if this is the 2nd circle within 1 second (send all to AI)
+ * - 'circle' if this is a single fast circle (becomes lasso selection)
+ * - 'none' if not a gesture
  */
 export function detectCircleGesture(points: Point[]): GestureResult {
   if (points.length < 10) {
@@ -87,9 +97,17 @@ export function detectCircleGesture(points: Point[]): GestureResult {
     const speedScore = Math.min(averageSpeed / 0.5, 1); // Cap at 0.5 px/ms
     const confidence = (circularityScore + speedScore) / 2;
 
+    // Check if this is a double circle (2nd circle within 1 second)
+    const now = Date.now();
+    const timeSinceLastCircle = now - lastCircleTimestamp;
+    const isDoubleCircle = timeSinceLastCircle < DOUBLE_CIRCLE_WINDOW_MS;
+
+    // Update last circle timestamp
+    lastCircleTimestamp = now;
+
     return {
       isGesture: true,
-      gestureType: 'circle',
+      gestureType: isDoubleCircle ? 'double_circle' : 'circle',
       confidence,
       metadata: {
         duration,
@@ -138,4 +156,12 @@ export function addTimestamps(points: Point[]): Point[] {
     ...p,
     timestamp: (p as any).timestamp || now + i
   }));
+}
+
+/**
+ * Reset double-circle detection state
+ * (useful when user cancels gesture or for testing)
+ */
+export function resetCircleDetection(): void {
+  lastCircleTimestamp = 0;
 }

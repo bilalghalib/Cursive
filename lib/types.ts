@@ -71,6 +71,7 @@ export interface Page {
   id: string;
   notebookId: string;
   pageNumber: number;       // 1, 2, 3, etc.
+  title?: string;           // Optional title: "Intro to Derivatives", "Practice Problems"
   size: 'A4' | 'Letter' | 'A5';
   orientation: 'portrait' | 'landscape';
   backgroundColor: string;
@@ -104,6 +105,14 @@ export interface LassoSelection {
   path: Point[];              // The lasso path itself
   selectedStrokes: number[];  // Indices of strokes within lasso
   bounds: BoundingBox;        // Bounding box of selection
+  pageId: string;             // Which page this selection is on
+}
+
+// Multi-page send context (for sending pages 2-4 together)
+export interface MultiPageSendContext {
+  primaryPageId: string;      // The page where lasso was drawn
+  includePageIds: string[];   // Additional pages to include
+  selectionBounds?: BoundingBox; // Optional: bounds of lasso selection
 }
 
 export interface CanvasState {
@@ -153,6 +162,7 @@ export interface CanvasActions {
   goToPage: (pageId: string) => void;
   nextPage: () => void;
   previousPage: () => void;
+  updatePageTitle: (pageId: string, title: string) => void;
 
   // Drawing actions
   startDrawing: (point: Point) => void;
@@ -170,7 +180,7 @@ export interface CanvasActions {
   continueLasso: (point: Point) => void;
   finishLasso: () => void;
   clearLasso: () => void;
-  sendLassoToAI: () => Promise<void>;
+  sendLassoToAI: (includePageIds?: string[]) => Promise<void>;
 
   // Pan actions
   startPan: (x: number, y: number) => void;

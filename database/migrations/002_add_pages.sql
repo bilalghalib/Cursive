@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.pages (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   notebook_id UUID NOT NULL REFERENCES public.notebooks(id) ON DELETE CASCADE,
   page_number INTEGER NOT NULL,
+  title TEXT, -- Optional page title: "Intro to Derivatives", "Practice Problems"
   size TEXT NOT NULL DEFAULT 'A4' CHECK (size IN ('A4', 'Letter', 'A5')),
   orientation TEXT NOT NULL DEFAULT 'portrait' CHECK (orientation IN ('portrait', 'landscape')),
   background_color TEXT NOT NULL DEFAULT '#ffffff',
