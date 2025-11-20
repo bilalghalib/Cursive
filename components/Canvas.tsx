@@ -73,11 +73,13 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
+    // Clear canvas (account for DPR scaling)
     ctx.save();
+    const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // Re-apply DPR scaling
     ctx.restore();
 
     // Apply transformations
