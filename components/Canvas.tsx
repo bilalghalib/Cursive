@@ -18,8 +18,10 @@ interface CanvasProps {
 }
 
 export function Canvas({ state, actions, canvasRef }: CanvasProps) {
-  // Help overlay state
+  // UI state
   const [showHelp, setShowHelp] = useState(false);
+  const [isAIProcessing, setIsAIProcessing] = useState(false);
+  const [aiLoadingMessage, setAILoadingMessage] = useState<string>('');
 
   // Initialize canvas
   useEffect(() => {
@@ -473,12 +475,17 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       return;
     }
 
+    // Show loading state
+    setIsAIProcessing(true);
+    setAILoadingMessage('Claude is thinking...');
+
     try {
       // Render new strokes to temporary canvas
       const imageData = await renderStrokesToImage(newStrokes);
       if (!imageData) {
         console.error('Failed to render strokes to image');
         actions.finishDrawing();
+        setIsAIProcessing(false);
         return;
       }
 
@@ -519,8 +526,13 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       });
     } catch (error) {
       console.error('Error sending to AI:', error);
+      setAILoadingMessage('Error: Failed to reach Claude');
+      setTimeout(() => setIsAIProcessing(false), 2000);
+      actions.finishDrawing();
+      return;
     }
 
+    setIsAIProcessing(false);
     actions.finishDrawing();
   };
 
@@ -551,6 +563,13 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
 
     console.log('Ask AI clicked for lasso selection', state.lassoSelection);
 
+    // Show loading state
+    setIsAIProcessing(true);
+    setAILoadingMessage('Claude is thinking...');
+
+    // Clear lasso selection immediately so UI feels responsive
+    actions.clearLasso();
+
     try {
       // Get selected strokes
       const selectedStrokes = state.lassoSelection.selectedStrokes.map(
@@ -561,7 +580,7 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       const imageData = await renderStrokesToImage(selectedStrokes);
       if (!imageData) {
         console.error('Failed to render strokes to image');
-        actions.clearLasso();
+        setIsAIProcessing(false);
         return;
       }
 
@@ -609,9 +628,12 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       });
     } catch (error) {
       console.error('Error sending to AI:', error);
+      setAILoadingMessage('Error: Failed to reach Claude');
+      setTimeout(() => setIsAIProcessing(false), 2000);
+      return;
     }
 
-    actions.clearLasso();
+    setIsAIProcessing(false);
   };
 
   const handleLassoDelete = () => {
@@ -695,6 +717,16 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
             onDelete={handleLassoDelete}
             onClear={handleLassoClear}
           />
+        )}
+
+        {/* AI Loading Indicator */}
+        {isAIProcessing && (
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 animate-pulse">
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            <span className="font-medium">{aiLoadingMessage}</span>
+          </div>
         )}
       </div>
 
