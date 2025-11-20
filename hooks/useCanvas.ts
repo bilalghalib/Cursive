@@ -486,6 +486,16 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       setLastAITimestamp(0);
     }, []),
 
+    deleteStrokes: useCallback((indices: number[]) => {
+      setDrawings(prev => {
+        const newDrawings = prev.filter((_, index) => !indices.includes(index));
+        // Update undo stack
+        setUndoStack(prevStack => [...prevStack, newDrawings]);
+        setRedoStack([]); // Clear redo stack when new action is performed
+        return newDrawings;
+      });
+    }, []),
+
     getCanvasImageData: useCallback((): ImageData | null => {
       if (!canvasRef.current) return null;
       const ctx = canvasRef.current.getContext('2d');
@@ -522,6 +532,7 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
     lassoSelection,
     chatHistory,
     textOverlays,
+    lastAITimestamp,
     hideAIResponses,
     typographyGuides,
     trainingMode,

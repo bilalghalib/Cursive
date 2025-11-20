@@ -139,6 +139,7 @@ export interface CanvasState {
   // Chat/Conversation state
   chatHistory: ChatMessage[];
   textOverlays: TextOverlay[];
+  lastAITimestamp: number;  // Timestamp of last AI interaction (for tracking "new" strokes)
 
   // Educational integrity
   hideAIResponses: boolean;
@@ -215,6 +216,7 @@ export interface CanvasActions {
 
   // Utility actions
   clearAll: () => void;
+  deleteStrokes: (indices: number[]) => void;
   getCanvasImageData: () => ImageData | null;
 }
 

@@ -349,6 +349,71 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     };
   };
 
+  // Helper to render strokes to a temporary canvas for AI processing
+  const renderStrokesToImage = async (strokes: Stroke[]): Promise<ImageData | null> => {
+    if (strokes.length === 0) return null;
+
+    // Calculate bounding box for all strokes
+    const allPoints = strokes.flatMap(s => s.points);
+    if (allPoints.length === 0) return null;
+
+    const xs = allPoints.map(p => p.x);
+    const ys = allPoints.map(p => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const padding = 20;
+    const width = maxX - minX + padding * 2;
+    const height = maxY - minY + padding * 2;
+
+    // Create temporary canvas
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Fill with white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    // Render each stroke
+    strokes.forEach(stroke => {
+      const outlinePoints = getStroke(stroke.points, {
+        size: stroke.width,
+        thinning: 0.5,
+        smoothing: 0.5,
+        streamline: 0.5,
+        simulatePressure: true
+      });
+
+      if (outlinePoints.length === 0) return;
+
+      ctx.save();
+      ctx.fillStyle = stroke.color;
+      ctx.beginPath();
+
+      // Adjust points to be relative to bounding box
+      const [firstPoint] = outlinePoints;
+      ctx.moveTo(firstPoint[0] - minX + padding, firstPoint[1] - minY + padding);
+
+      for (let i = 1; i < outlinePoints.length; i++) {
+        const [x, y] = outlinePoints[i];
+        ctx.lineTo(x - minX + padding, y - minY + padding);
+      }
+
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // Get image data
+    return ctx.getImageData(0, 0, width, height);
+  };
+
   // Pointer event handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -395,9 +460,67 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
 
   // Handle double-circle: Send all new strokes immediately
   const handleDoubleCircleSend = async () => {
-    // TODO: Implement sending all new strokes to AI
-    // For now, just finish the drawing
     console.log('Double circle detected! Sending all new strokes...');
+
+    // Get all strokes created since last AI interaction
+    const newStrokes = state.drawings.filter(stroke =>
+      !stroke.isAI && (stroke.timestamp || 0) > state.lastAITimestamp
+    );
+
+    if (newStrokes.length === 0) {
+      console.log('No new strokes to send');
+      actions.finishDrawing();
+      return;
+    }
+
+    try {
+      // Render new strokes to temporary canvas
+      const imageData = await renderStrokesToImage(newStrokes);
+      if (!imageData) {
+        console.error('Failed to render strokes to image');
+        actions.finishDrawing();
+        return;
+      }
+
+      // Convert to base64
+      const base64Image = imageDataToBase64(imageData);
+
+      // Send to AI
+      const response = await sendImageToAI(base64Image);
+      console.log('AI Response:', response);
+
+      // Add AI response as text overlay
+      // TODO: Position AI response spatially using calculateSpatialContext
+      const currentPage = state.pages.find(p => p.id === state.currentPageId);
+      const pageHeight = currentPage?.size === 'A4' ? PAGE.A4_HEIGHT : PAGE.A4_HEIGHT;
+
+      actions.addTextOverlay({
+        id: `overlay-${Date.now()}`,
+        text: response.transcription,
+        x: 50,
+        y: pageHeight - 100,
+        width: 700,
+        fontSize: 16,
+        color: '#3b82f6', // Blue for AI responses
+        timestamp: Date.now(),
+        isAI: true
+      });
+
+      // Update last AI timestamp
+      actions.setLastAITimestamp(Date.now());
+
+      // Add to chat history
+      actions.addChatMessage({
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: response.transcription,
+        timestamp: Date.now(),
+        isHandwritten: false
+      });
+    } catch (error) {
+      console.error('Error sending to AI:', error);
+    }
+
     actions.finishDrawing();
   };
 
@@ -424,21 +547,80 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
 
   // Lasso selection handlers
   const handleLassoAskAI = async () => {
-    // TODO: Implement AI send with spatial context
+    if (!state.lassoSelection) return;
+
     console.log('Ask AI clicked for lasso selection', state.lassoSelection);
+
+    try {
+      // Get selected strokes
+      const selectedStrokes = state.lassoSelection.selectedStrokes.map(
+        index => state.drawings[index]
+      );
+
+      // Render selected strokes to image
+      const imageData = await renderStrokesToImage(selectedStrokes);
+      if (!imageData) {
+        console.error('Failed to render strokes to image');
+        actions.clearLasso();
+        return;
+      }
+
+      // Convert to base64
+      const base64Image = imageDataToBase64(imageData);
+
+      // Calculate spatial context for AI response positioning
+      const spatialContext = calculateSpatialContext(
+        state.lassoSelection.bounds,
+        state.drawings,
+        state.textOverlays,
+        PAGE.A4_WIDTH,
+        PAGE.A4_HEIGHT
+      );
+
+      console.log('Spatial context:', spatialContext);
+
+      // Send to AI
+      const response = await sendImageToAI(base64Image);
+      console.log('AI Response:', response);
+
+      // Add AI response as text overlay at suggested position
+      actions.addTextOverlay({
+        id: `overlay-${Date.now()}`,
+        text: response.transcription,
+        x: 50,
+        y: spatialContext.suggestedResponseY,
+        width: 700,
+        fontSize: 16,
+        color: '#3b82f6', // Blue for AI responses
+        timestamp: Date.now(),
+        isAI: true
+      });
+
+      // Update last AI timestamp
+      actions.setLastAITimestamp(Date.now());
+
+      // Add to chat history
+      actions.addChatMessage({
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: response.transcription,
+        timestamp: Date.now(),
+        isHandwritten: false
+      });
+    } catch (error) {
+      console.error('Error sending to AI:', error);
+    }
+
     actions.clearLasso();
   };
 
   const handleLassoDelete = () => {
     if (!state.lassoSelection) return;
 
-    // Filter out selected strokes
-    const newDrawings = state.drawings.filter((_, index) =>
-      !state.lassoSelection!.selectedStrokes.includes(index)
-    );
+    console.log('Deleting strokes:', state.lassoSelection.selectedStrokes);
 
-    // TODO: Update drawings state properly through actions
-    console.log('Delete clicked', state.lassoSelection);
+    // Delete selected strokes using new action
+    actions.deleteStrokes(state.lassoSelection.selectedStrokes);
     actions.clearLasso();
   };
 
