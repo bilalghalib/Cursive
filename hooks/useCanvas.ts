@@ -83,11 +83,13 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
 
     // Drawing actions
     startDrawing: useCallback((point: Point) => {
-      setCurrentStroke([point]);
+      const pointWithTimestamp = { ...point, timestamp: Date.now() };
+      setCurrentStroke([pointWithTimestamp]);
     }, []),
 
     continueDrawing: useCallback((point: Point) => {
-      setCurrentStroke(prev => [...prev, point]);
+      const pointWithTimestamp = { ...point, timestamp: Date.now() };
+      setCurrentStroke(prev => [...prev, pointWithTimestamp]);
     }, []),
 
     finishDrawing: useCallback(() => {

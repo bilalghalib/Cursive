@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getStroke } from 'perfect-freehand';
-import type { CanvasState, CanvasActions, Stroke, ChatMessage, TextOverlay } from '@/lib/types';
+import type { CanvasState, CanvasActions, Stroke, ChatMessage, TextOverlay, Point } from '@/lib/types';
 import { sendImageToAI, imageDataToBase64, sendChatToAI } from '@/lib/ai';
+import { detectCircleGesture, type GestureResult } from '@/lib/gestureDetection';
+import { GestureConfirmation } from './GestureConfirmation';
 
 interface CanvasProps {
   state: CanvasState;
@@ -12,6 +14,15 @@ interface CanvasProps {
 }
 
 export function Canvas({ state, actions, canvasRef }: CanvasProps) {
+  // Gesture detection state
+  const [pendingGesture, setPendingGesture] = useState<{
+    gestureResult: GestureResult;
+    strokePoints: Point[];
+  } | null>(null);
+
+  // Track last AI interaction timestamp (to know which strokes are "new")
+  const [lastAITimestamp, setLastAITimestamp] = useState<number>(0);
+
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -469,7 +480,22 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
 
     switch (state.currentTool) {
       case 'draw': {
-        actions.finishDrawing();
+        // Check if this stroke is a gesture before finishing
+        if (state.currentStroke.length > 0) {
+          const gestureResult = detectCircleGesture(state.currentStroke);
+
+          if (gestureResult.isGesture && gestureResult.confidence > 0.5) {
+            // Detected a gesture! Show confirmation overlay
+            setPendingGesture({
+              gestureResult,
+              strokePoints: [...state.currentStroke]
+            });
+            // Don't call finishDrawing yet - wait for user confirmation
+          } else {
+            // Not a gesture, just add as regular stroke
+            actions.finishDrawing();
+          }
+        }
         break;
       }
       case 'select': {
@@ -558,6 +584,127 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     }
   };
 
+  // Gesture confirmation handlers
+  const handleGestureSend = async () => {
+    if (!pendingGesture) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    try {
+      // Get all "new" strokes (drawn since last AI interaction)
+      const newStrokes = state.drawings.filter(
+        stroke => !stroke.timestamp || stroke.timestamp > lastAITimestamp
+      );
+
+      // If no new strokes, just send the gesture circle itself (shouldn't happen, but handle gracefully)
+      if (newStrokes.length === 0) {
+        console.warn('No new strokes to send');
+        setPendingGesture(null);
+        actions.finishDrawing(); // Clear the current stroke
+        return;
+      }
+
+      // Create a temporary canvas to render all new strokes
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
+
+      // Clear with white background
+      tempCtx.fillStyle = '#ffffff';
+      tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+      // Draw all new strokes
+      newStrokes.forEach(stroke => {
+        drawStroke(tempCtx, stroke);
+      });
+
+      // Get image data
+      const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const base64Image = imageDataToBase64(imageData);
+
+      // Transcribe handwriting
+      const transcription = await sendImageToAI(base64Image);
+
+      // Add user message to chat history
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: transcription.transcription,
+        timestamp: Date.now(),
+        isHandwritten: true
+      };
+      actions.addChatMessage(userMessage);
+
+      // Get AI response
+      const aiMessages = [...state.chatHistory, userMessage].map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      const aiResponse = await sendChatToAI(aiMessages);
+
+      // Add AI message to chat history
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: aiResponse,
+        timestamp: Date.now() + 1
+      };
+      actions.addChatMessage(aiMessage);
+
+      // Calculate position for AI response (below the gesture circle)
+      const gestureBounds = calculateBounds(pendingGesture.strokePoints);
+      const responseY = gestureBounds.maxY + 30; // 30px below gesture
+
+      // Display AI response inline with blue color
+      const overlay: TextOverlay = {
+        id: aiMessage.id,
+        text: aiResponse,
+        x: gestureBounds.minX,
+        y: responseY,
+        width: Math.min(600, canvas.width - gestureBounds.minX - 50),
+        fontSize: 18,
+        color: '#3b82f6', // Blue color for AI responses
+        timestamp: Date.now(),
+        isAI: true
+      };
+      actions.addTextOverlay(overlay);
+
+      // Update last AI interaction timestamp
+      setLastAITimestamp(Date.now());
+
+      // Clear pending gesture and current stroke
+      setPendingGesture(null);
+      actions.finishDrawing(); // This will clear currentStroke
+
+    } catch (error) {
+      console.error('Error sending to AI:', error);
+      alert('Failed to send to AI. Please try again.');
+      setPendingGesture(null);
+      actions.finishDrawing();
+    }
+  };
+
+  const handleGestureCancel = () => {
+    // User cancelled - just add the stroke as a regular drawing
+    actions.finishDrawing();
+    setPendingGesture(null);
+  };
+
+  // Helper function to calculate bounds of points
+  const calculateBounds = (points: Point[]) => {
+    const xs = points.map(p => p.x);
+    const ys = points.map(p => p.y);
+    return {
+      minX: Math.min(...xs),
+      maxX: Math.max(...xs),
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys)
+    };
+  };
+
   // Update cursor based on tool
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -631,6 +778,16 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
           </div>
         )}
       </div>
+
+      {/* Gesture confirmation overlay */}
+      {pendingGesture && (
+        <GestureConfirmation
+          onSend={handleGestureSend}
+          onCancel={handleGestureCancel}
+          confidence={pendingGesture.gestureResult.confidence}
+          duration={500}
+        />
+      )}
     </div>
   );
 }

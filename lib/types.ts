@@ -4,6 +4,7 @@ export interface Point {
   x: number;
   y: number;
   pressure?: number; // For pressure sensitivity
+  timestamp?: number; // For gesture detection (speed calculation)
 }
 
 export interface Stroke {
