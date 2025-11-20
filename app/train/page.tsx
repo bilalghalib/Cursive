@@ -217,8 +217,9 @@ export default function TrainPage() {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
 
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const dpr = window.devicePixelRatio || 1;
+      const x = (e.clientX - rect.left) * dpr;
+      const y = (e.clientY - rect.top) * dpr;
 
       setIsDrawing(true);
       actions.startDrawing({ x, y, pressure: e.pressure });
@@ -231,8 +232,9 @@ export default function TrainPage() {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const dpr = window.devicePixelRatio || 1;
+    const x = (e.clientX - rect.left) * dpr;
+    const y = (e.clientY - rect.top) * dpr;
 
     actions.continueDrawing({ x, y, pressure: e.pressure });
   };
@@ -245,6 +247,11 @@ export default function TrainPage() {
     // Submit the stroke as a training sample
     if (state.currentStroke.length > 0) {
       const currentItem = getCurrentItem();
+
+      // Determine current emotional state (for now default to neutral, will add UI for this)
+      const currentEmotion = 'neutral'; // TODO: Get from UI state
+      const currentIntensity = 0.5; // TODO: Get from UI state
+
       const stroke = {
         points: state.currentStroke,
         color: '#000000',
@@ -253,14 +260,17 @@ export default function TrainPage() {
         // Add metadata for training
         character: currentItem,
         phase: trainingProgress.phase,
-        variation: trainingProgress.variationIndex + 1
+        variation: trainingProgress.variationIndex + 1,
+        // Emotional state metadata (for LSTM training)
+        emotional_state: currentEmotion,
+        intensity: currentIntensity
       };
 
       actions.submitTrainingSample(stroke);
       actions.finishDrawing();
 
-      // Advance to next item/variation
-      advanceTraining();
+      // DON'T auto-advance - let user see the stroke and manually advance
+      // advanceTraining();  // Commented out - add manual "Next" button instead
     }
   };
 
@@ -271,14 +281,22 @@ export default function TrainPage() {
       style: state.trainingMode.style,
       samples: state.drawings.map(stroke => ({
         character: stroke.character,
+        emotional_state: (stroke as any).emotional_state || 'neutral',
+        intensity: (stroke as any).intensity || 0.5,
+        points: stroke.points.map(p => ({
+          x: p.x,
+          y: p.y,
+          pressure: p.pressure || 0.5,
+          t: 0 // Timestamp can be 0 for now
+        })),
         strokeOrder: stroke.strokeOrder,
-        points: stroke.points,
-        color: stroke.color,
-        width: stroke.width
+        phase: (stroke as any).phase,
+        variation: (stroke as any).variation
       })),
       metadata: {
         totalSamples: state.drawings.length,
         samplesPerCharacter: 5,
+        emotionalStates: ['neutral', 'excited', 'thoughtful', 'calm', 'urgent']
       }
     };
 
@@ -469,6 +487,17 @@ export default function TrainPage() {
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors text-sm font-medium"
             >
               Clear Stroke
+            </button>
+
+            <button
+              onClick={() => {
+                // Clear canvas and advance to next character
+                actions.clearCanvas();
+                advanceTraining();
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors text-sm font-medium"
+            >
+              Next Character →
             </button>
 
             <button

@@ -20,13 +20,28 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
+    // Set canvas size (account for high-DPI displays like iPad Retina)
     const resizeCanvas = () => {
       const container = canvas.parentElement;
       if (!container) return;
 
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+
+      // Set actual size in memory (scaled for retina)
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+
+      // Set display size (CSS pixels)
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+
+      // Scale context to match
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+      }
 
       // Redraw after resize
       redrawCanvas();
@@ -397,7 +412,7 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     switch (state.currentTool) {
       case 'draw': {
         const { x, y } = getCanvasCoords(e);
-        actions.startDrawing({ x, y });
+        actions.startDrawing({ x, y, pressure: e.pressure });
         break;
       }
       case 'select': {
@@ -424,7 +439,7 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       case 'draw': {
         if (state.currentStroke.length > 0) {
           const { x, y } = getCanvasCoords(e);
-          actions.continueDrawing({ x, y });
+          actions.continueDrawing({ x, y, pressure: e.pressure });
         }
         break;
       }
