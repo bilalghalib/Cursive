@@ -4,6 +4,7 @@ export interface Point {
   x: number;
   y: number;
   pressure?: number; // For pressure sensitivity
+  timestamp?: number; // For gesture detection (speed calculation)
 }
 
 export interface Stroke {
@@ -21,7 +22,7 @@ export interface Stroke {
   normalized?: boolean;      // Has this been normalized to guides?
 }
 
-export type Tool = 'draw' | 'select' | 'pan' | 'zoom';
+export type Tool = 'draw' | 'select' | 'pan' | 'zoom' | 'lasso';
 
 export interface SelectionRect {
   startX: number;
@@ -65,9 +66,62 @@ export interface TrainingMode {
   style: 'print' | 'cursive'; // Writing style
 }
 
+// Page system (A4-sized pages in notebook)
+export interface Page {
+  id: string;
+  notebookId: string;
+  pageNumber: number;       // 1, 2, 3, etc.
+  title?: string;           // Optional title: "Intro to Derivatives", "Practice Problems"
+  size: 'A4' | 'Letter' | 'A5';
+  orientation: 'portrait' | 'landscape';
+  backgroundColor: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Bounding box for spatial calculations
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  type?: 'student_stroke' | 'ai_response' | 'selection';
+}
+
+// Spatial context sent to AI for intelligent response positioning
+export interface SpatialContext {
+  pageSize: {
+    width: number;   // e.g., 794 for A4
+    height: number;  // e.g., 1123 for A4
+  };
+  selectionBounds: BoundingBox;
+  occupiedRectangles: BoundingBox[];  // All existing content on page
+  suggestedResponseY: number;         // Where AI should start writing
+  availableSpaceBelow: number;        // Space between selection and occupied content below
+}
+
+// Lasso selection (closed path with selected strokes)
+export interface LassoSelection {
+  path: Point[];              // The lasso path itself
+  selectedStrokes: number[];  // Indices of strokes within lasso
+  bounds: BoundingBox;        // Bounding box of selection
+  pageId: string;             // Which page this selection is on
+}
+
+// Multi-page send context (for sending pages 2-4 together)
+export interface MultiPageSendContext {
+  primaryPageId: string;      // The page where lasso was drawn
+  includePageIds: string[];   // Additional pages to include
+  selectionBounds?: BoundingBox; // Optional: bounds of lasso selection
+}
+
 export interface CanvasState {
   // Tool state
   currentTool: Tool;
+
+  // Page system
+  pages: Page[];
+  currentPageId: string;
 
   // Drawing state
   drawings: Stroke[];
@@ -80,10 +134,12 @@ export interface CanvasState {
 
   // Selection state
   selectionRect: SelectionRect | null;
+  lassoSelection: LassoSelection | null;
 
   // Chat/Conversation state
   chatHistory: ChatMessage[];
   textOverlays: TextOverlay[];
+  lastAITimestamp: number;  // Timestamp of last AI interaction (for tracking "new" strokes)
 
   // Educational integrity
   hideAIResponses: boolean;
@@ -101,16 +157,33 @@ export interface CanvasActions {
   // Tool actions
   setTool: (tool: Tool) => void;
 
+  // Page actions
+  addPage: () => void;
+  deletePage: (pageId: string) => void;
+  goToPage: (pageId: string) => void;
+  nextPage: () => void;
+  previousPage: () => void;
+  updatePageTitle: (pageId: string, title: string) => void;
+
   // Drawing actions
   startDrawing: (point: Point) => void;
   continueDrawing: (point: Point) => void;
   finishDrawing: () => void;
 
-  // Selection actions
+  // Selection actions (rectangular)
   startSelection: (x: number, y: number) => void;
   updateSelection: (x: number, y: number) => void;
   finishSelection: () => ImageData | null;
   clearSelection: () => void;
+
+  // Lasso actions
+  startLasso: (point: Point) => void;
+  continueLasso: (point: Point) => void;
+  finishLasso: () => void;
+  clearLasso: () => void;
+  setLassoSelection: (selection: LassoSelection | null) => void;
+  setLastAITimestamp: (timestamp: number) => void;
+  sendLassoToAI: (includePageIds?: string[]) => Promise<void>;
 
   // Pan actions
   startPan: (x: number, y: number) => void;
@@ -143,6 +216,7 @@ export interface CanvasActions {
 
   // Utility actions
   clearAll: () => void;
+  deleteStrokes: (indices: number[]) => void;
   getCanvasImageData: () => ImageData | null;
 }
 

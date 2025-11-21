@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions, TypographyGuides, TrainingMode } from '@/lib/types';
-import { TRAINING, CANVAS } from '@/lib/constants';
+import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions, TypographyGuides, TrainingMode, Page, LassoSelection } from '@/lib/types';
+import { TRAINING, CANVAS, PAGE } from '@/lib/constants';
 import { isValidStroke, sanitizeStroke } from '@/lib/validation';
 
 // Training alphabet prompts
@@ -20,9 +20,26 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
   // Tool state
   const [currentTool, setCurrentTool] = useState<Tool>('draw');
 
+  // Page system state
+  const [pages, setPages] = useState<Page[]>([{
+    id: 'page-1',
+    notebookId: 'notebook-1', // TODO: Get from actual notebook
+    pageNumber: 1,
+    title: undefined,
+    size: PAGE.DEFAULT_SIZE,
+    orientation: PAGE.DEFAULT_ORIENTATION,
+    backgroundColor: PAGE.DEFAULT_BACKGROUND,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  }]);
+  const [currentPageId, setCurrentPageId] = useState<string>('page-1');
+
   // Drawing state
   const [drawings, setDrawings] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
+
+  // Last AI interaction timestamp (for tracking "new" strokes)
+  const [lastAITimestamp, setLastAITimestamp] = useState<number>(0);
 
   // Transform state
   const [scale, setScale] = useState<number>(CANVAS.DEFAULT_SCALE);
@@ -31,6 +48,7 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
 
   // Selection state
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
+  const [lassoSelection, setLassoSelection] = useState<LassoSelection | null>(null);
 
   // Chat/Conversation state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -76,18 +94,81 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
     setTool: useCallback((tool: Tool) => {
       setCurrentTool(tool);
       // Clear selection when switching tools
-      if (tool !== 'select') {
+      if (tool !== 'select' && tool !== 'lasso') {
         setSelectionRect(null);
+        setLassoSelection(null);
       }
+    }, []),
+
+    // Page actions
+    addPage: useCallback(() => {
+      const newPageNumber = pages.length + 1;
+      const newPage: Page = {
+        id: `page-${Date.now()}`,
+        notebookId: pages[0]?.notebookId || 'notebook-1',
+        pageNumber: newPageNumber,
+        title: undefined,
+        size: PAGE.DEFAULT_SIZE,
+        orientation: PAGE.DEFAULT_ORIENTATION,
+        backgroundColor: PAGE.DEFAULT_BACKGROUND,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      setPages(prev => [...prev, newPage]);
+      setCurrentPageId(newPage.id);
+    }, [pages]),
+
+    deletePage: useCallback((pageId: string) => {
+      if (pages.length === 1) {
+        alert('Cannot delete the last page');
+        return;
+      }
+      setPages(prev => {
+        const filtered = prev.filter(p => p.id !== pageId);
+        // Renumber pages
+        return filtered.map((p, i) => ({ ...p, pageNumber: i + 1 }));
+      });
+      // If deleting current page, go to previous or next
+      if (pageId === currentPageId) {
+        const currentIndex = pages.findIndex(p => p.id === pageId);
+        const newPage = pages[currentIndex - 1] || pages[currentIndex + 1];
+        if (newPage) setCurrentPageId(newPage.id);
+      }
+    }, [pages, currentPageId]),
+
+    goToPage: useCallback((pageId: string) => {
+      setCurrentPageId(pageId);
+    }, []),
+
+    nextPage: useCallback(() => {
+      const currentIndex = pages.findIndex(p => p.id === currentPageId);
+      if (currentIndex < pages.length - 1) {
+        setCurrentPageId(pages[currentIndex + 1].id);
+      }
+    }, [pages, currentPageId]),
+
+    previousPage: useCallback(() => {
+      const currentIndex = pages.findIndex(p => p.id === currentPageId);
+      if (currentIndex > 0) {
+        setCurrentPageId(pages[currentIndex - 1].id);
+      }
+    }, [pages, currentPageId]),
+
+    updatePageTitle: useCallback((pageId: string, title: string) => {
+      setPages(prev => prev.map(p =>
+        p.id === pageId ? { ...p, title: title || undefined, updatedAt: Date.now() } : p
+      ));
     }, []),
 
     // Drawing actions
     startDrawing: useCallback((point: Point) => {
-      setCurrentStroke([point]);
+      const pointWithTimestamp = { ...point, timestamp: Date.now() };
+      setCurrentStroke([pointWithTimestamp]);
     }, []),
 
     continueDrawing: useCallback((point: Point) => {
-      setCurrentStroke(prev => [...prev, point]);
+      const pointWithTimestamp = { ...point, timestamp: Date.now() };
+      setCurrentStroke(prev => [...prev, pointWithTimestamp]);
     }, []),
 
     finishDrawing: useCallback(() => {
@@ -147,6 +228,45 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
     clearSelection: useCallback(() => {
       setSelectionRect(null);
     }, []),
+
+    // Lasso actions
+    startLasso: useCallback((point: Point) => {
+      // Lasso starts just like drawing
+      const pointWithTimestamp = { ...point, timestamp: Date.now() };
+      setCurrentStroke([pointWithTimestamp]);
+    }, []),
+
+    continueLasso: useCallback((point: Point) => {
+      // Continue lasso path
+      const pointWithTimestamp = { ...point, timestamp: Date.now() };
+      setCurrentStroke(prev => [...prev, pointWithTimestamp]);
+    }, []),
+
+    finishLasso: useCallback(() => {
+      // Lasso is finished - this is called from Canvas when circle gesture is detected
+      // The actual selection logic happens in Canvas.tsx
+      setCurrentStroke([]);
+    }, []),
+
+    clearLasso: useCallback(() => {
+      setLassoSelection(null);
+    }, []),
+
+    // Helper to set lasso selection from Canvas (after circle detection)
+    setLassoSelection: useCallback((selection: LassoSelection | null) => {
+      setLassoSelection(selection);
+    }, []),
+
+    // Helper to update last AI timestamp (after AI responds)
+    setLastAITimestamp: useCallback((timestamp: number) => {
+      setLastAITimestamp(timestamp);
+    }, []),
+
+    sendLassoToAI: useCallback(async (includePageIds?: string[]) => {
+      // TODO: Implement AI send flow
+      // This will be called from Canvas.tsx when user clicks "Ask AI"
+      console.log('sendLassoToAI called', { lassoSelection, includePageIds });
+    }, [lassoSelection]),
 
     // Pan actions
     startPan: useCallback((x: number, y: number) => {
@@ -357,11 +477,23 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       setUndoStack([[]]);
       setRedoStack([]);
       setSelectionRect(null);
+      setLassoSelection(null);
       setChatHistory([]);
       setTextOverlays([]);
       setScale(CANVAS.DEFAULT_SCALE);
       setPanX(0);
       setPanY(0);
+      setLastAITimestamp(0);
+    }, []),
+
+    deleteStrokes: useCallback((indices: number[]) => {
+      setDrawings(prev => {
+        const newDrawings = prev.filter((_, index) => !indices.includes(index));
+        // Update undo stack
+        setUndoStack(prevStack => [...prevStack, newDrawings]);
+        setRedoStack([]); // Clear redo stack when new action is performed
+        return newDrawings;
+      });
     }, []),
 
     getCanvasImageData: useCallback((): ImageData | null => {
@@ -389,14 +521,18 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
 
   const state: CanvasState = {
     currentTool,
+    pages,
+    currentPageId,
     drawings,
     currentStroke,
     scale,
     panX,
     panY,
     selectionRect,
+    lassoSelection,
     chatHistory,
     textOverlays,
+    lastAITimestamp,
     hideAIResponses,
     typographyGuides,
     trainingMode,

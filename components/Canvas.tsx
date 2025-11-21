@@ -1,9 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getStroke } from 'perfect-freehand';
-import type { CanvasState, CanvasActions, Stroke, ChatMessage, TextOverlay } from '@/lib/types';
+import type { CanvasState, CanvasActions, Stroke, ChatMessage, TextOverlay, Point, LassoSelection, BoundingBox } from '@/lib/types';
 import { sendImageToAI, imageDataToBase64, sendChatToAI } from '@/lib/ai';
+import { detectCircleGesture, type GestureResult, resetCircleDetection } from '@/lib/gestureDetection';
+import { findStrokesInCircle, calculatePointsBounds, calculateSpatialContext } from '@/lib/spatial';
+import { PAGE } from '@/lib/constants';
+import { TopBar } from './TopBar';
+import { GestureCheatSheet } from './GestureCheatSheet';
+import { LassoSelectionUI } from './LassoSelectionUI';
 
 interface CanvasProps {
   state: CanvasState;
@@ -12,6 +18,11 @@ interface CanvasProps {
 }
 
 export function Canvas({ state, actions, canvasRef }: CanvasProps) {
+  // UI state
+  const [showHelp, setShowHelp] = useState(false);
+  const [isAIProcessing, setIsAIProcessing] = useState(false);
+  const [aiLoadingMessage, setAILoadingMessage] = useState<string>('');
+
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -20,13 +31,35 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
+    // Set canvas size (account for high-DPI displays like iPad Retina)
     const resizeCanvas = () => {
       const container = canvas.parentElement;
       if (!container) return;
 
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+
+      // For A4 page rendering, calculate canvas size to fit page with padding
+      const currentPage = state.pages.find(p => p.id === state.currentPageId);
+      const pageWidth = currentPage?.size === 'A4' ? PAGE.A4_WIDTH : PAGE.A4_WIDTH;
+      const pageHeight = currentPage?.size === 'A4' ? PAGE.A4_HEIGHT : PAGE.A4_HEIGHT;
+
+      // Canvas should fit the page with padding
+      const width = Math.max(container.clientWidth, pageWidth + PAGE.PAGE_PADDING * 2);
+      const height = Math.max(container.clientHeight, pageHeight + PAGE.PAGE_PADDING * 2);
+
+      // Set actual size in memory (scaled for retina)
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+
+      // Set display size (CSS pixels)
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+
+      // Scale context to match
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+      }
 
       // Redraw after resize
       redrawCanvas();
@@ -35,21 +68,15 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Configure drawing context
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
     return () => {
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, []);
+  }, [state.currentPageId, state.pages]);
 
   // Redraw canvas whenever state changes
   useEffect(() => {
     redrawCanvas();
-  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect, state.textOverlays, state.typographyGuides]);
+  }, [state.drawings, state.currentStroke, state.scale, state.panX, state.panY, state.selectionRect, state.lassoSelection, state.textOverlays, state.typographyGuides, state.currentPageId]);
 
   const redrawCanvas = () => {
     const canvas = canvasRef.current;
@@ -58,25 +85,64 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
+    // Clear canvas (account for DPR scaling)
     ctx.save();
+    const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#f3f4f6'; // gray-100 background (outside page)
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // Re-apply DPR scaling
     ctx.restore();
 
-    // Apply transformations
+    // Get current page dimensions
+    const currentPage = state.pages.find(p => p.id === state.currentPageId);
+    const pageWidth = currentPage?.size === 'A4' ? PAGE.A4_WIDTH : PAGE.A4_WIDTH;
+    const pageHeight = currentPage?.size === 'A4' ? PAGE.A4_HEIGHT : PAGE.A4_HEIGHT;
+
+    // Calculate page position (centered in canvas)
+    const canvasWidth = canvas.width / dpr;
+    const canvasHeight = canvas.height / dpr;
+    const pageX = (canvasWidth - pageWidth) / 2;
+    const pageY = PAGE.PAGE_PADDING;
+
+    // Draw A4 page with shadow
     ctx.save();
-    ctx.translate(state.panX, state.panY);
+
+    // Shadow
+    ctx.shadowColor = PAGE.SHADOW_COLOR;
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 4;
+
+    // Page background
+    ctx.fillStyle = currentPage?.backgroundColor || PAGE.DEFAULT_BACKGROUND;
+    ctx.fillRect(pageX, pageY, pageWidth, pageHeight);
+
+    // Page border
+    ctx.strokeStyle = PAGE.BORDER_COLOR;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pageX, pageY, pageWidth, pageHeight);
+
+    ctx.restore();
+
+    // Set clip region to page area (strokes only appear on page)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(pageX, pageY, pageWidth, pageHeight);
+    ctx.clip();
+
+    // Apply transformations (relative to page)
+    ctx.translate(pageX + state.panX, pageY + state.panY);
     ctx.scale(state.scale, state.scale);
 
     // Draw typography guides (if enabled)
     if (state.typographyGuides.enabled) {
-      drawTypographyGuides(ctx);
+      drawTypographyGuides(ctx, pageWidth);
     }
 
-    // Draw all strokes
-    state.drawings.forEach(stroke => {
+    // Draw all strokes on current page
+    const currentPageStrokes = state.drawings; // TODO: Filter by page_id when DB is connected
+    currentPageStrokes.forEach(stroke => {
       drawStroke(ctx, stroke);
     });
 
@@ -89,6 +155,11 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       });
     }
 
+    // Draw lasso selection path (if active)
+    if (state.lassoSelection) {
+      drawLassoPath(ctx, state.lassoSelection.path);
+    }
+
     // Draw text overlays (filter AI responses if hideAIResponses is true)
     const visibleOverlays = state.hideAIResponses
       ? state.textOverlays.filter(overlay => !overlay.isAI)
@@ -98,11 +169,14 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       drawTextOverlay(ctx, overlay);
     });
 
-    ctx.restore();
+    ctx.restore(); // Restore after page clipping
 
-    // Draw selection rectangle (after restoring transform, so it's not affected by pan/zoom)
+    // Draw selection rectangle (outside page clipping)
     if (state.selectionRect) {
+      ctx.save();
+      ctx.translate(pageX, pageY);
       drawSelectionRect(ctx, state.selectionRect);
+      ctx.restore();
     }
   };
 
@@ -113,47 +187,65 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     const inputPoints = stroke.points.map(p => [
       p.x,
       p.y,
-      p.pressure || 0.5 // Default pressure if not available
+      p.pressure || 0.5
     ]);
 
     // Use perfect-freehand to generate smooth outline
     const outlinePoints = getStroke(inputPoints, {
-      size: stroke.width * 4,        // Base size (multiply by 4 for good thickness)
-      thinning: 0.5,                  // Pressure sensitivity
-      smoothing: 0.5,                 // Curve smoothing
-      streamline: 0.5,                // Point reduction for smoothness
-      easing: (t) => t,               // Linear pressure easing
-      start: { taper: 0, cap: true }, // Round start cap
-      end: { taper: 0, cap: true }    // Round end cap
+      size: stroke.width * 4,
+      thinning: 0.5,
+      smoothing: 0.5,
+      streamline: 0.5,
+      easing: (t) => t,
+      start: { taper: 0, cap: true },
+      end: { taper: 0, cap: true }
     });
 
-    // Render the stroke as a filled polygon
     if (outlinePoints.length === 0) return;
 
     ctx.beginPath();
     ctx.fillStyle = stroke.color;
-
-    // Move to first point
     ctx.moveTo(outlinePoints[0][0], outlinePoints[0][1]);
-
-    // Draw outline polygon
     for (let i = 1; i < outlinePoints.length; i++) {
       ctx.lineTo(outlinePoints[i][0], outlinePoints[i][1]);
     }
-
     ctx.closePath();
     ctx.fill();
   };
 
+  const drawLassoPath = (ctx: CanvasRenderingContext2D, path: Point[]) => {
+    if (path.length < 2) return;
+
+    ctx.save();
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = '#3b82f6'; // blue-500
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.7;
+
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i = 1; i < path.length; i++) {
+      ctx.lineTo(path[i].x, path[i].y);
+    }
+    // Close the path if it's a closed loop
+    if (path.length > 3) {
+      ctx.closePath();
+    }
+    ctx.stroke();
+
+    // Fill with semi-transparent blue
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.05)';
+    ctx.fill();
+
+    ctx.restore();
+  };
+
   const drawTextOverlay = (ctx: CanvasRenderingContext2D, overlay: TextOverlay) => {
     ctx.save();
-
-    // Set font and text properties
     ctx.font = `${overlay.fontSize}px 'Caveat', cursive`;
     ctx.fillStyle = overlay.color;
     ctx.textBaseline = 'top';
 
-    // Word wrap the text
     const words = overlay.text.split(' ');
     const lineHeight = overlay.fontSize * 1.4;
     let currentLine = '';
@@ -172,26 +264,18 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       }
     }
     ctx.fillText(currentLine, overlay.x, y);
-
     ctx.restore();
   };
 
-  const drawTypographyGuides = (ctx: CanvasRenderingContext2D) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
+  const drawTypographyGuides = (ctx: CanvasRenderingContext2D, pageWidth: number) => {
     const guides = state.typographyGuides;
-    const canvasWidth = canvas.width / state.scale;
 
     ctx.save();
-
-    // --- HORIZONTAL GUIDELINES ---
     ctx.strokeStyle = guides.color;
     ctx.globalAlpha = guides.opacity;
     ctx.lineWidth = 1;
     ctx.setLineDash([5, 5]);
 
-    // Draw horizontal guide lines
     const lines = [
       { y: guides.baseline - guides.ascender, label: 'Ascender', color: '#3b82f6' },
       { y: guides.baseline - guides.capHeight, label: 'Cap Height', color: '#8b5cf6' },
@@ -204,141 +288,17 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       ctx.strokeStyle = line.color;
       ctx.globalAlpha = line.bold ? 0.6 : guides.opacity;
       ctx.lineWidth = line.bold ? 2 : 1;
-
-      if (!line.bold) {
-        ctx.setLineDash([5, 5]);
-      } else {
-        ctx.setLineDash([10, 5]);
-      }
+      ctx.setLineDash(line.bold ? [10, 5] : [5, 5]);
 
       ctx.beginPath();
       ctx.moveTo(0, line.y);
-      ctx.lineTo(canvasWidth, line.y);
+      ctx.lineTo(pageWidth, line.y);
       ctx.stroke();
 
-      // Draw label on left
       ctx.globalAlpha = 1;
       ctx.fillStyle = line.color;
       ctx.font = line.bold ? 'bold 12px sans-serif' : '11px sans-serif';
       ctx.fillText(line.label, 10, line.y - 5);
-
-      // Draw label on right for clarity
-      ctx.textAlign = 'right';
-      ctx.fillText(line.label, canvasWidth - 10, line.y - 5);
-      ctx.textAlign = 'left';
-    });
-
-    // --- VERTICAL SPACING GUIDES (for letter width consistency) ---
-    ctx.globalAlpha = 0.15;
-    ctx.setLineDash([3, 8]);
-    ctx.lineWidth = 0.5;
-
-    // Draw vertical guides at regular intervals (letter width guides)
-    const letterWidthGuide = guides.xHeight * 0.8; // Approximate letter width
-    for (let x = 100; x < canvasWidth; x += letterWidthGuide) {
-      ctx.strokeStyle = '#94a3b8'; // slate-400
-      ctx.beginPath();
-      ctx.moveTo(x, guides.baseline - guides.ascender - 20);
-      ctx.lineTo(x, guides.baseline + guides.descender + 20);
-      ctx.stroke();
-    }
-
-    // --- SLANT ANGLE GUIDE (for cursive consistency) ---
-    // Draw slanted guides to help maintain consistent slant
-    ctx.globalAlpha = 0.12;
-    ctx.setLineDash([2, 10]);
-    ctx.strokeStyle = '#8b5cf6'; // purple-500
-    const slantAngle = 15; // degrees (typical cursive slant)
-    const slantSpacing = 80;
-
-    for (let x = 100; x < canvasWidth; x += slantSpacing) {
-      const dx = Math.tan((slantAngle * Math.PI) / 180) * (guides.ascender + guides.descender);
-      ctx.beginPath();
-      ctx.moveTo(x - dx / 2, guides.baseline - guides.ascender);
-      ctx.lineTo(x + dx / 2, guides.baseline + guides.descender);
-      ctx.stroke();
-    }
-
-    // --- CONNECTION POINT GUIDES (for cursive connections) ---
-    // Show where letters typically connect (at baseline or slightly above)
-    ctx.globalAlpha = 0.3;
-    ctx.setLineDash([]);
-    ctx.strokeStyle = '#f59e0b'; // amber-500
-    ctx.lineWidth = 2;
-
-    // Connection height (typically 1/3 up from baseline to x-height)
-    const connectionY = guides.baseline - (guides.xHeight / 3);
-
-    // Draw connection point markers (small circles)
-    for (let x = 100 + letterWidthGuide; x < canvasWidth; x += letterWidthGuide) {
-      ctx.beginPath();
-      ctx.arc(x, connectionY, 3, 0, Math.PI * 2);
-      ctx.fillStyle = '#f59e0b';
-      ctx.fill();
-    }
-
-    // --- TRAINING MODE SPECIFIC GUIDES ---
-    if (state.trainingMode.active) {
-      // Draw character positioning box (where to write the current character)
-      const boxX = 120;
-      const boxWidth = guides.xHeight * 1.2; // Character width guide
-
-      ctx.globalAlpha = 0.25;
-      ctx.strokeStyle = '#06b6d4'; // cyan-500
-      ctx.lineWidth = 2;
-      ctx.setLineDash([10, 5]);
-
-      // Draw vertical boundaries for character
-      ctx.beginPath();
-      ctx.moveTo(boxX, guides.baseline - guides.ascender - 10);
-      ctx.lineTo(boxX, guides.baseline + guides.descender + 10);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(boxX + boxWidth, guides.baseline - guides.ascender - 10);
-      ctx.lineTo(boxX + boxWidth, guides.baseline + guides.descender + 10);
-      ctx.stroke();
-
-      // Draw "write here" indicator
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = '#06b6d4';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('✏️ Write here', boxX + boxWidth / 2, guides.baseline - guides.ascender - 25);
-      ctx.textAlign = 'left';
-    }
-
-    // --- LEGEND (top-right corner) ---
-    ctx.globalAlpha = 0.8;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.fillRect(canvasWidth - 180, 10, 170, 140);
-
-    ctx.strokeStyle = '#cbd5e1';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(canvasWidth - 180, 10, 170, 140);
-
-    ctx.globalAlpha = 1;
-    ctx.font = 'bold 11px sans-serif';
-    ctx.fillStyle = '#1e293b';
-    ctx.fillText('Typography Guides', canvasWidth - 175, 25);
-
-    ctx.font = '10px sans-serif';
-    const legendItems = [
-      { color: '#ef4444', label: 'Baseline (sit letters)' },
-      { color: '#10b981', label: 'X-Height (lowercase)' },
-      { color: '#8b5cf6', label: 'Cap Height (uppercase)' },
-      { color: '#3b82f6', label: 'Ascender (b,d,h,k,l,t)' },
-      { color: '#f59e0b', label: 'Descender (g,j,p,q,y)' },
-      { color: '#8b5cf6', label: 'Slant Guide (~15°)' },
-      { color: '#f59e0b', label: 'Connection Points' },
-    ];
-
-    legendItems.forEach((item, i) => {
-      const y = 45 + i * 14;
-      ctx.fillStyle = item.color;
-      ctx.fillRect(canvasWidth - 170, y - 6, 10, 3);
-      ctx.fillStyle = '#475569';
-      ctx.fillText(item.label, canvasWidth - 155, y);
     });
 
     ctx.restore();
@@ -350,27 +310,32 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     const width = Math.abs(rect.endX - rect.startX);
     const height = Math.abs(rect.endY - rect.startY);
 
-    // Draw dashed rectangle
     ctx.save();
     ctx.setLineDash([5, 5]);
-    ctx.strokeStyle = '#2563eb'; // blue-600
+    ctx.strokeStyle = '#2563eb';
     ctx.lineWidth = 2;
     ctx.strokeRect(minX, minY, width, height);
-
-    // Draw semi-transparent fill
     ctx.fillStyle = 'rgba(37, 99, 235, 0.1)';
     ctx.fillRect(minX, minY, width, height);
     ctx.restore();
   };
 
-  // Get canvas coordinates from event
+  // Get canvas coordinates from event (relative to page)
   const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - state.panX) / state.scale;
-    const y = (e.clientY - rect.top - state.panY) / state.scale;
+    const dpr = window.devicePixelRatio || 1;
+    const canvasWidth = canvas.width / dpr;
+
+    const currentPage = state.pages.find(p => p.id === state.currentPageId);
+    const pageWidth = currentPage?.size === 'A4' ? PAGE.A4_WIDTH : PAGE.A4_WIDTH;
+    const pageX = (canvasWidth - pageWidth) / 2;
+    const pageY = PAGE.PAGE_PADDING;
+
+    const x = (e.clientX - rect.left - pageX - state.panX) / state.scale;
+    const y = (e.clientY - rect.top - pageY - state.panY) / state.scale;
 
     return { x, y };
   };
@@ -386,60 +351,87 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     };
   };
 
+  // Helper to render strokes to a temporary canvas for AI processing
+  const renderStrokesToImage = async (strokes: Stroke[]): Promise<ImageData | null> => {
+    if (strokes.length === 0) return null;
+
+    // Calculate bounding box for all strokes
+    const allPoints = strokes.flatMap(s => s.points);
+    if (allPoints.length === 0) return null;
+
+    const xs = allPoints.map(p => p.x);
+    const ys = allPoints.map(p => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const padding = 20;
+    const width = maxX - minX + padding * 2;
+    const height = maxY - minY + padding * 2;
+
+    // Create temporary canvas
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Fill with white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    // Render each stroke
+    strokes.forEach(stroke => {
+      const outlinePoints = getStroke(stroke.points, {
+        size: stroke.width,
+        thinning: 0.5,
+        smoothing: 0.5,
+        streamline: 0.5,
+        simulatePressure: true
+      });
+
+      if (outlinePoints.length === 0) return;
+
+      ctx.save();
+      ctx.fillStyle = stroke.color;
+      ctx.beginPath();
+
+      // Adjust points to be relative to bounding box
+      const [firstPoint] = outlinePoints;
+      ctx.moveTo(firstPoint[0] - minX + padding, firstPoint[1] - minY + padding);
+
+      for (let i = 1; i < outlinePoints.length; i++) {
+        const [x, y] = outlinePoints[i];
+        ctx.lineTo(x - minX + padding, y - minY + padding);
+      }
+
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // Get image data
+    return ctx.getImageData(0, 0, width, height);
+  };
+
   // Pointer event handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Capture pointer for smooth tracking
     canvas.setPointerCapture(e.pointerId);
 
-    switch (state.currentTool) {
-      case 'draw': {
-        const { x, y } = getCanvasCoords(e);
-        actions.startDrawing({ x, y });
-        break;
-      }
-      case 'select': {
-        const { x, y } = getScreenCoords(e);
-        actions.startSelection(x, y);
-        break;
-      }
-      case 'pan': {
-        const { x, y } = getScreenCoords(e);
-        actions.startPan(x, y);
-        // Change cursor
-        canvas.style.cursor = 'grabbing';
-        break;
-      }
-      // Zoom mode doesn't use pointer down
-    }
+    // Always draw in this simplified version (no tool switching)
+    const { x, y } = getCanvasCoords(e);
+    actions.startDrawing({ x, y, pressure: e.pressure });
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    switch (state.currentTool) {
-      case 'draw': {
-        if (state.currentStroke.length > 0) {
-          const { x, y } = getCanvasCoords(e);
-          actions.continueDrawing({ x, y });
-        }
-        break;
-      }
-      case 'select': {
-        if (state.selectionRect) {
-          const { x, y } = getScreenCoords(e);
-          actions.updateSelection(x, y);
-        }
-        break;
-      }
-      case 'pan': {
-        const { x, y } = getScreenCoords(e);
-        actions.updatePan(x, y);
-        break;
-      }
+    if (state.currentStroke.length > 0) {
+      const { x, y } = getCanvasCoords(e);
+      actions.continueDrawing({ x, y, pressure: e.pressure });
     }
   };
 
@@ -447,136 +439,242 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Release pointer capture
     canvas.releasePointerCapture(e.pointerId);
 
-    switch (state.currentTool) {
-      case 'draw': {
-        actions.finishDrawing();
-        break;
-      }
-      case 'select': {
-        // Selection finished - trigger AI conversation flow
-        const imageData = actions.finishSelection();
-        if (imageData) {
-          try {
-            // Step 1: Transcribe handwriting
-            const base64Image = imageDataToBase64(imageData);
-            const transcription = await sendImageToAI(base64Image);
+    if (state.currentStroke.length > 0) {
+      const gestureResult = detectCircleGesture(state.currentStroke);
 
-            // Step 2: Add user message to chat history
-            const userMessage: ChatMessage = {
-              id: Date.now().toString(),
-              role: 'user',
-              content: transcription.transcription,
-              timestamp: Date.now(),
-              isHandwritten: true
-            };
-            actions.addChatMessage(userMessage);
-
-            // Step 3: Get AI response
-            const aiMessages = [...state.chatHistory, userMessage].map(msg => ({
-              role: msg.role,
-              content: msg.content
-            }));
-
-            const aiResponse = await sendChatToAI(aiMessages);
-
-            // Step 4: Add AI message to chat history
-            const aiMessage: ChatMessage = {
-              id: (Date.now() + 1).toString(),
-              role: 'assistant',
-              content: aiResponse,
-              timestamp: Date.now() + 1
-            };
-            actions.addChatMessage(aiMessage);
-
-            // Step 5: Display AI response as text overlay on canvas
-            // Find a good position (below the selection, or at top if needed)
-            const selectionY = state.selectionRect ? Math.max(state.selectionRect.startY, state.selectionRect.endY) : 100;
-
-            const overlay: TextOverlay = {
-              id: aiMessage.id,
-              text: aiResponse,
-              x: 50,
-              y: selectionY + 50,
-              width: canvas.width - 100,
-              fontSize: 24,
-              color: '#4338ca', // indigo-700 for AI responses
-              timestamp: Date.now(),
-              isAI: true  // Mark as AI-generated for hide/show toggle
-            };
-            actions.addTextOverlay(overlay);
-
-            // Clear selection rectangle
-            actions.clearSelection();
-          } catch (error) {
-            console.error('Error in AI conversation:', error);
-            alert('Failed to process selection. Please try again.');
-          }
+      if (gestureResult.isGesture && gestureResult.confidence > 0.5) {
+        // Detected circle gesture!
+        if (gestureResult.gestureType === 'double_circle') {
+          // Double circle: Send all new strokes immediately
+          await handleDoubleCircleSend();
+        } else if (gestureResult.gestureType === 'circle') {
+          // Single circle: Create lasso selection
+          handleSingleCircleSelection();
         }
-        break;
-      }
-      case 'pan': {
-        actions.finishPan();
-        canvas.style.cursor = 'grab';
-        break;
+      } else {
+        // Not a gesture, just add as regular stroke
+        actions.finishDrawing();
       }
     }
   };
 
-  // Mouse wheel for zoom
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    if (state.currentTool === 'zoom') {
-      e.preventDefault();
+  // Handle double-circle: Send all new strokes immediately
+  const handleDoubleCircleSend = async () => {
+    console.log('Double circle detected! Sending all new strokes...');
 
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+    // Get all strokes created since last AI interaction
+    const newStrokes = state.drawings.filter(stroke =>
+      !stroke.isAI && (stroke.timestamp || 0) > state.lastAITimestamp
+    );
 
-      const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left - state.panX) / state.scale;
-      const y = (e.clientY - rect.top - state.panY) / state.scale;
+    if (newStrokes.length === 0) {
+      console.log('No new strokes to send');
+      actions.finishDrawing();
+      return;
+    }
 
-      actions.zoom(-e.deltaY, x, y);
+    // Show loading state
+    setIsAIProcessing(true);
+    setAILoadingMessage('Claude is thinking...');
+
+    try {
+      // Render new strokes to temporary canvas
+      const imageData = await renderStrokesToImage(newStrokes);
+      if (!imageData) {
+        console.error('Failed to render strokes to image');
+        actions.finishDrawing();
+        setIsAIProcessing(false);
+        return;
+      }
+
+      // Convert to base64
+      const base64Image = imageDataToBase64(imageData);
+
+      // Send to AI
+      const response = await sendImageToAI(base64Image);
+      console.log('AI Response:', response);
+
+      // Add AI response as text overlay
+      // TODO: Position AI response spatially using calculateSpatialContext
+      const currentPage = state.pages.find(p => p.id === state.currentPageId);
+      const pageHeight = currentPage?.size === 'A4' ? PAGE.A4_HEIGHT : PAGE.A4_HEIGHT;
+
+      actions.addTextOverlay({
+        id: `overlay-${Date.now()}`,
+        text: response.transcription,
+        x: 50,
+        y: pageHeight - 100,
+        width: 700,
+        fontSize: 16,
+        color: '#3b82f6', // Blue for AI responses
+        timestamp: Date.now(),
+        isAI: true
+      });
+
+      // Update last AI timestamp
+      actions.setLastAITimestamp(Date.now());
+
+      // Add to chat history
+      actions.addChatMessage({
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: response.transcription,
+        timestamp: Date.now(),
+        isHandwritten: false
+      });
+    } catch (error) {
+      console.error('Error sending to AI:', error);
+      setAILoadingMessage('Error: Failed to reach Claude');
+      setTimeout(() => setIsAIProcessing(false), 2000);
+      actions.finishDrawing();
+      return;
+    }
+
+    setIsAIProcessing(false);
+    actions.finishDrawing();
+  };
+
+  // Handle single circle: Select strokes inside
+  const handleSingleCircleSelection = () => {
+    const selectedIndices = findStrokesInCircle(state.drawings, state.currentStroke);
+
+    if (selectedIndices.length > 0) {
+      const bounds = calculatePointsBounds(state.currentStroke);
+      const lassoSelection: LassoSelection = {
+        path: [...state.currentStroke],
+        selectedStrokes: selectedIndices,
+        bounds,
+        pageId: state.currentPageId
+      };
+
+      actions.setLassoSelection(lassoSelection);
+      actions.finishDrawing();
+    } else {
+      // No strokes inside, just add circle as regular drawing
+      actions.finishDrawing();
     }
   };
 
-  // Update cursor based on tool
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // Lasso selection handlers
+  const handleLassoAskAI = async () => {
+    if (!state.lassoSelection) return;
 
-    switch (state.currentTool) {
-      case 'draw':
-        canvas.style.cursor = 'crosshair';
-        break;
-      case 'select':
-        canvas.style.cursor = 'crosshair';
-        break;
-      case 'pan':
-        canvas.style.cursor = 'grab';
-        break;
-      case 'zoom':
-        canvas.style.cursor = 'zoom-in';
-        break;
+    console.log('Ask AI clicked for lasso selection', state.lassoSelection);
+
+    // Show loading state
+    setIsAIProcessing(true);
+    setAILoadingMessage('Claude is thinking...');
+
+    // Clear lasso selection immediately so UI feels responsive
+    actions.clearLasso();
+
+    try {
+      // Get selected strokes
+      const selectedStrokes = state.lassoSelection.selectedStrokes.map(
+        index => state.drawings[index]
+      );
+
+      // Render selected strokes to image
+      const imageData = await renderStrokesToImage(selectedStrokes);
+      if (!imageData) {
+        console.error('Failed to render strokes to image');
+        setIsAIProcessing(false);
+        return;
+      }
+
+      // Convert to base64
+      const base64Image = imageDataToBase64(imageData);
+
+      // Calculate spatial context for AI response positioning
+      const spatialContext = calculateSpatialContext(
+        state.lassoSelection.bounds,
+        state.drawings,
+        state.textOverlays,
+        PAGE.A4_WIDTH,
+        PAGE.A4_HEIGHT
+      );
+
+      console.log('Spatial context:', spatialContext);
+
+      // Send to AI
+      const response = await sendImageToAI(base64Image);
+      console.log('AI Response:', response);
+
+      // Add AI response as text overlay at suggested position
+      actions.addTextOverlay({
+        id: `overlay-${Date.now()}`,
+        text: response.transcription,
+        x: 50,
+        y: spatialContext.suggestedResponseY,
+        width: 700,
+        fontSize: 16,
+        color: '#3b82f6', // Blue for AI responses
+        timestamp: Date.now(),
+        isAI: true
+      });
+
+      // Update last AI timestamp
+      actions.setLastAITimestamp(Date.now());
+
+      // Add to chat history
+      actions.addChatMessage({
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: response.transcription,
+        timestamp: Date.now(),
+        isHandwritten: false
+      });
+    } catch (error) {
+      console.error('Error sending to AI:', error);
+      setAILoadingMessage('Error: Failed to reach Claude');
+      setTimeout(() => setIsAIProcessing(false), 2000);
+      return;
     }
-  }, [state.currentTool]);
+
+    setIsAIProcessing(false);
+  };
+
+  const handleLassoDelete = () => {
+    if (!state.lassoSelection) return;
+
+    console.log('Deleting strokes:', state.lassoSelection.selectedStrokes);
+
+    // Delete selected strokes using new action
+    actions.deleteStrokes(state.lassoSelection.selectedStrokes);
+    actions.clearLasso();
+  };
+
+  const handleLassoClear = () => {
+    actions.clearLasso();
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape to clear selection
-      if (e.key === 'Escape' && state.selectionRect) {
-        actions.clearSelection();
+      // ? key to toggle help
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowHelp(prev => !prev);
       }
 
-      // Ctrl/Cmd + Z for undo
+      // Escape to clear selection or lasso
+      if (e.key === 'Escape') {
+        if (state.lassoSelection) {
+          actions.clearLasso();
+        } else if (state.selectionRect) {
+          actions.clearSelection();
+        }
+      }
+
+      // Cmd/Ctrl + Z for undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         actions.undo();
       }
 
-      // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y for redo
+      // Cmd/Ctrl + Shift + Z for redo
       if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
           ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
         e.preventDefault();
@@ -586,34 +684,56 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.selectionRect, actions]);
+  }, [state.lassoSelection, state.selectionRect, actions]);
 
   return (
-    <div className="relative w-full h-full bg-white">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full touch-none"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerOut={handlePointerUp}
-        onWheel={handleWheel}
+    <div className="flex flex-col h-screen bg-gray-100">
+      {/* Top Bar */}
+      <TopBar
+        notebookTitle="My Notebook" // TODO: Get from actual notebook
+        pages={state.pages}
+        currentPageId={state.currentPageId}
+        onPageChange={actions.goToPage}
+        onPageTitleUpdate={actions.updatePageTitle}
+        onHelpClick={() => setShowHelp(true)}
       />
 
-      {/* Tool indicator */}
-      <div className="absolute bottom-4 right-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded-md text-sm">
-        <div className="flex items-center gap-2">
-          <span>Tool: <strong>{state.currentTool}</strong></span>
-          {state.currentTool === 'zoom' && (
-            <span className="ml-2">| Zoom: {Math.round(state.scale * 100)}%</span>
-          )}
-        </div>
-        {state.chatHistory.length > 0 && (
-          <div className="text-xs opacity-75 mt-1">
-            {state.chatHistory.length} messages
+      {/* Canvas Area */}
+      <div className="flex-1 relative overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full touch-none"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerOut={handlePointerUp}
+        />
+
+        {/* Lasso Selection UI */}
+        {state.lassoSelection && (
+          <LassoSelectionUI
+            selection={state.lassoSelection}
+            onAskAI={handleLassoAskAI}
+            onDelete={handleLassoDelete}
+            onClear={handleLassoClear}
+          />
+        )}
+
+        {/* AI Loading Indicator */}
+        {isAIProcessing && (
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 animate-pulse">
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            <span className="font-medium">{aiLoadingMessage}</span>
           </div>
         )}
       </div>
+
+      {/* Help Overlay */}
+      {showHelp && (
+        <GestureCheatSheet onClose={() => setShowHelp(false)} />
+      )}
     </div>
   );
 }
