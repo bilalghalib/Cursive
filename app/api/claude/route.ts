@@ -45,7 +45,7 @@ const ALLOWED_MODELS = [
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { model, max_tokens, messages, stream } = body;
+    const { model, max_tokens, messages, stream, custom_system_prompt } = body;
 
     // Validate model
     if (!model || !ALLOWED_MODELS.includes(model)) {
@@ -77,6 +77,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Use custom system prompt if provided, otherwise use default tutor prompt
+    const systemPrompt = custom_system_prompt || TUTOR_SYSTEM_PROMPT;
+
     // Check if we should use Supabase Edge Function or direct API call
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest) {
           model,
           max_tokens,
           messages,
-          system: TUTOR_SYSTEM_PROMPT,
+          system: systemPrompt,
           stream: stream || false
         })
       });
@@ -123,7 +126,7 @@ export async function POST(request: NextRequest) {
           model,
           max_tokens,
           messages,
-          system: TUTOR_SYSTEM_PROMPT
+          system: systemPrompt
         })
       });
 

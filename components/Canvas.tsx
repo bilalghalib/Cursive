@@ -75,8 +75,12 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       drawTypographyGuides(ctx);
     }
 
-    // Draw all strokes
-    state.drawings.forEach(stroke => {
+    // Draw all strokes (filter AI strokes if hideAIResponses is true)
+    const visibleDrawings = state.hideAIResponses
+      ? state.drawings.filter(stroke => !stroke.isAI)
+      : state.drawings;
+
+    visibleDrawings.forEach(stroke => {
       drawStroke(ctx, stroke);
     });
 
