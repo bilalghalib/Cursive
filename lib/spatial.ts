@@ -123,6 +123,9 @@ export function boundsOverlap(a: BoundingBox, b: BoundingBox): boolean {
  * - Selection bounds (what user circled/lassoed)
  * - All occupied rectangles (existing strokes and AI responses)
  * - Suggested position for AI response (below selection, avoiding collisions)
+ *
+ * Philosophy: "Write below naturally" - AI responses appear below the related content,
+ * never in margins unless student wrote there. Respects page boundaries.
  */
 export function calculateSpatialContext(
   selectionBounds: BoundingBox,
@@ -131,6 +134,15 @@ export function calculateSpatialContext(
   pageWidth: number = A4_DIMENSIONS.width,
   pageHeight: number = A4_DIMENSIONS.height
 ): SpatialContext {
+  // Page margins (AI should stay within these bounds)
+  const PAGE_MARGIN_TOP = 50;
+  const PAGE_MARGIN_BOTTOM = 50;
+  const PAGE_MARGIN_LEFT = 50;
+  const PAGE_MARGIN_RIGHT = 50;
+
+  const MIN_SPACING_BELOW_SELECTION = 30; // Space between selection and AI response
+  const MIN_SPACE_NEEDED = 100; // Minimum space needed to fit a response
+
   // Calculate bounding boxes for all existing content
   const strokeBounds = strokes.map(calculateStrokeBounds);
   const overlayBounds = textOverlays.map(calculateTextOverlayBounds);
@@ -144,28 +156,37 @@ export function calculateSpatialContext(
     rect => rect.y > selectionBottom
   );
 
-  // Calculate suggested response Y position
-  let suggestedResponseY = selectionBottom + 30; // 30px padding below selection
+  // Calculate suggested response Y position (below selection with padding)
+  let suggestedResponseY = selectionBottom + MIN_SPACING_BELOW_SELECTION;
 
   // Check if there's content blocking the suggested position
   if (contentBelow.length > 0) {
     const nearestContentY = Math.min(...contentBelow.map(rect => rect.y));
     const availableSpace = nearestContentY - selectionBottom;
 
-    if (availableSpace < 100) {
+    if (availableSpace < MIN_SPACE_NEEDED) {
       // Not enough space between selection and next content
       // Find the lowest content and suggest below it
       const lowestContentBottom = Math.max(
         ...occupiedRectangles.map(rect => rect.y + rect.height)
       );
-      suggestedResponseY = lowestContentBottom + 30;
+      suggestedResponseY = lowestContentBottom + MIN_SPACING_BELOW_SELECTION;
     }
+  }
+
+  // Ensure suggested position stays within page margins
+  // If too close to bottom, it will be handled by canvas rendering (scroll or new page)
+  const maxAllowedY = pageHeight - PAGE_MARGIN_BOTTOM - MIN_SPACE_NEEDED;
+  if (suggestedResponseY > maxAllowedY) {
+    // Response would be too close to page bottom
+    // Either suggest at margin or indicate need for new page
+    suggestedResponseY = Math.min(suggestedResponseY, maxAllowedY);
   }
 
   // Calculate available space below selection (before hitting other content or page bottom)
   const nextContentY = contentBelow.length > 0
     ? Math.min(...contentBelow.map(rect => rect.y))
-    : pageHeight;
+    : pageHeight - PAGE_MARGIN_BOTTOM;
 
   const availableSpaceBelow = Math.max(0, nextContentY - suggestedResponseY);
 
