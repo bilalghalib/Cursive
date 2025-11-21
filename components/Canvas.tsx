@@ -140,9 +140,15 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
       drawTypographyGuides(ctx, pageWidth);
     }
 
-    // Draw all strokes on current page
-    const currentPageStrokes = state.drawings; // TODO: Filter by page_id when DB is connected
-    currentPageStrokes.forEach(stroke => {
+    // Draw all strokes on current page (filter AI strokes if hideAIResponses is true)
+    // TODO: Filter by page_id when DB is connected
+    const currentPageStrokes = state.drawings; // Will filter by state.currentPageId when DB connected
+
+    const visibleDrawings = state.hideAIResponses
+      ? currentPageStrokes.filter(stroke => !stroke.isAI)
+      : currentPageStrokes;
+
+    visibleDrawings.forEach(stroke => {
       drawStroke(ctx, stroke);
     });
 
