@@ -22,14 +22,14 @@ export interface AIConfig {
 // Default configuration
 const DEFAULT_CONFIG: AIConfig = {
   model: 'claude-sonnet-4-5-20250929',
-  max_tokens: 1024
+  max_tokens: 2048  // Increased for tutor-mode responses
 };
 
 /**
- * Send an image to Claude for transcription
+ * Send an image to Claude for tutor response (Socratic method)
  * @param imageData Base64 encoded image data (with data:image/png;base64, prefix)
  * @param config Optional AI configuration
- * @returns Transcription and tags
+ * @returns Tutor response
  */
 export async function sendImageToAI(
   imageData: string,
@@ -65,12 +65,7 @@ export async function sendImageToAI(
               },
               {
                 type: 'text',
-                text: 'Transcribe this handwritten text and respond with ONLY valid JSON (no markdown code blocks, no extra text):\n' +
-                  '{\n' +
-                  '  "transcription": "provide only transcription of the handwriting",\n' +
-                  '  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]\n' +
-                  '}\n' +
-                  'Provide up to 5 relevant tags for the content. Return ONLY the JSON object, nothing else.'
+                text: 'Please read what I wrote and respond as a helpful tutor. Use your Socratic approach to help me think deeper about this topic.'
               }
             ]
           }
@@ -86,7 +81,12 @@ export async function sendImageToAI(
     const data = await response.json();
     const text = data.content[0].text;
 
-    return parseAIResponse(text);
+    // For tutor mode, we don't need JSON parsing - just return the text directly
+    return {
+      transcription: text,
+      tags: [],
+      fullResponse: text
+    };
   } catch (error) {
     console.error('Error in AI image service:', error);
     throw error;
