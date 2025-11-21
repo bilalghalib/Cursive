@@ -1,26 +1,43 @@
 -- ============================================================================
--- CURSIVE - UNIFIED DATABASE SCHEMA (Canonical Version v2)
+-- CURSIVE - VALUES ALIGNMENT MIGRATION
+-- Created: 2025-11-21
 -- ============================================================================
--- This is the CORRECT and COMPLETE schema for Cursive.
--- Architecture: Next.js + Supabase Auth + PostgreSQL
--- All tables use UUID and reference auth.users(id) from Supabase Auth
+-- This migration aligns the database with Cursive's core educational values:
+-- 1. Handwriting as Human Experience
+-- 2. Learning Through Deliberate Practice
+-- 3. Educational Integrity (hide AI, export clean work)
+-- 4. Transparent AI (visible system prompts)
+-- 5. Handwriting Literacy
 --
--- Last Updated: 2025-11-21
--- Changes from v1:
--- - Separated billing table (Stripe webhook pattern)
--- - Added educational columns: is_ai_generated, user_type, hide_ai_responses
--- - Added custom_system_prompt for transparent AI
--- - Dropped public.users (anti-pattern - use auth.users)
+-- BREAKING CHANGES:
+-- - Drops public.users table (uses auth.users instead)
+-- - Changes all IDs from INTEGER to UUID
+-- - Adds educational columns: is_ai_generated, user_type, hide_ai_responses
+-- - Separates billing table (for Stripe webhook pattern)
+--
+-- ⚠️ WARNING: This will DELETE all existing data. Run only on clean database.
 -- ============================================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================================
+-- STEP 1: DROP OLD TABLES (clean slate)
+-- ============================================================================
+
+DROP TABLE IF EXISTS public.api_usage CASCADE;
+DROP TABLE IF EXISTS public.billing CASCADE;
+DROP TABLE IF EXISTS public.drawings CASCADE;
+DROP TABLE IF EXISTS public.notebooks CASCADE;
+DROP TABLE IF EXISTS public.user_handwriting CASCADE;
+DROP TABLE IF EXISTS public.user_settings CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE; -- Anti-pattern - we use auth.users
+
+-- ============================================================================
 -- TABLE: notebooks
 -- Stores collections of drawings (notebooks/canvases)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.notebooks (
+CREATE TABLE public.notebooks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL DEFAULT 'Untitled Notebook',
@@ -32,9 +49,9 @@ CREATE TABLE IF NOT EXISTS public.notebooks (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_notebooks_user_id ON public.notebooks(user_id);
-CREATE INDEX IF NOT EXISTS idx_notebooks_updated_at ON public.notebooks(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_notebooks_share_id ON public.notebooks(share_id) WHERE share_id IS NOT NULL;
+CREATE INDEX idx_notebooks_user_id ON public.notebooks(user_id);
+CREATE INDEX idx_notebooks_updated_at ON public.notebooks(updated_at DESC);
+CREATE INDEX idx_notebooks_share_id ON public.notebooks(share_id) WHERE share_id IS NOT NULL;
 
 COMMENT ON TABLE public.notebooks IS 'User notebooks containing collections of drawings';
 COMMENT ON COLUMN public.notebooks.user_id IS 'References Supabase auth.users(id) - NO public.users table';
@@ -42,9 +59,9 @@ COMMENT ON COLUMN public.notebooks.share_id IS 'Public share ID for shareable no
 
 -- ============================================================================
 -- TABLE: drawings
--- Stores individual drawings/strokes with AI interactions
+-- Individual strokes/drawings with AI interactions
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.drawings (
+CREATE TABLE public.drawings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   notebook_id UUID NOT NULL REFERENCES public.notebooks(id) ON DELETE CASCADE,
   stroke_data JSONB,
@@ -52,26 +69,29 @@ CREATE TABLE IF NOT EXISTS public.drawings (
   ai_response TEXT,
   drawing_type TEXT NOT NULL DEFAULT 'handwriting' CHECK (drawing_type IN ('handwriting', 'typed', 'shape')),
   canvas_state JSONB,
+
+  -- EDUCATIONAL INTEGRITY (Value #3)
   is_ai_generated BOOLEAN NOT NULL DEFAULT FALSE,
+
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_drawings_notebook_id ON public.drawings(notebook_id);
-CREATE INDEX IF NOT EXISTS idx_drawings_created_at ON public.drawings(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_drawings_is_ai ON public.drawings(is_ai_generated);
+CREATE INDEX idx_drawings_notebook_id ON public.drawings(notebook_id);
+CREATE INDEX idx_drawings_created_at ON public.drawings(created_at DESC);
+CREATE INDEX idx_drawings_is_ai ON public.drawings(is_ai_generated);
 
 COMMENT ON TABLE public.drawings IS 'Individual drawings with stroke data and AI interactions';
 COMMENT ON COLUMN public.drawings.stroke_data IS 'JSON containing canvas stroke data with pressure';
 COMMENT ON COLUMN public.drawings.transcription IS 'OCR text from handwriting';
 COMMENT ON COLUMN public.drawings.ai_response IS 'AI response to the drawing/text';
-COMMENT ON COLUMN public.drawings.is_ai_generated IS 'TRUE if this drawing was created by AI (for hide/show toggle)';
+COMMENT ON COLUMN public.drawings.is_ai_generated IS 'TRUE if AI created this (for Student Mode hide/show toggle)';
 
 -- ============================================================================
 -- TABLE: user_handwriting
--- Stores user's handwriting samples and style profile for AI mimicry
+-- User handwriting samples and style profile for AI mimicry
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.user_handwriting (
+CREATE TABLE public.user_handwriting (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
   samples JSONB,
@@ -81,7 +101,7 @@ CREATE TABLE IF NOT EXISTS public.user_handwriting (
 );
 
 -- Index
-CREATE INDEX IF NOT EXISTS idx_user_handwriting_user_id ON public.user_handwriting(user_id);
+CREATE INDEX idx_user_handwriting_user_id ON public.user_handwriting(user_id);
 
 COMMENT ON TABLE public.user_handwriting IS 'Stores user handwriting samples and style profiles for AI writeback';
 COMMENT ON COLUMN public.user_handwriting.samples IS 'Raw stroke data collected during training';
@@ -91,7 +111,7 @@ COMMENT ON COLUMN public.user_handwriting.style_profile IS 'Analyzed style param
 -- TABLE: api_usage
 -- Track API usage for billing and analytics
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.api_usage (
+CREATE TABLE public.api_usage (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   tokens_used INTEGER NOT NULL,
@@ -104,64 +124,114 @@ CREATE TABLE IF NOT EXISTS public.api_usage (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_api_usage_user_created ON public.api_usage(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_api_usage_created_at ON public.api_usage(created_at DESC);
+CREATE INDEX idx_api_usage_user_created ON public.api_usage(user_id, created_at DESC);
+CREATE INDEX idx_api_usage_created_at ON public.api_usage(created_at DESC);
 
 COMMENT ON TABLE public.api_usage IS 'Track API usage for billing and analytics';
 COMMENT ON COLUMN public.api_usage.cost IS 'Calculated cost in USD';
 
 -- ============================================================================
 -- TABLE: user_settings
--- User-specific settings, subscription, and BYOK API keys
+-- User preferences, subscription, BYOK API keys
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.user_settings (
+CREATE TABLE public.user_settings (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   encrypted_api_key TEXT,
   subscription_tier TEXT NOT NULL DEFAULT 'free' CHECK (subscription_tier IN ('free', 'pro', 'enterprise')),
-  -- Educational features
+
+  -- EDUCATIONAL FEATURES (Values #2, #3)
   user_type TEXT NOT NULL DEFAULT 'student' CHECK (user_type IN ('student', 'parent', 'teacher', 'school', 'individual')),
   hide_ai_responses BOOLEAN NOT NULL DEFAULT FALSE,
-  -- Transparent AI
-  custom_system_prompt TEXT,
+
+  -- TRANSPARENT AI (Value #4)
+  custom_system_prompt TEXT, -- User can customize AI tutor behavior
+
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Index
-CREATE INDEX IF NOT EXISTS idx_user_settings_user_type ON public.user_settings(user_type);
+CREATE INDEX idx_user_settings_user_type ON public.user_settings(user_type);
 
-COMMENT ON TABLE public.user_settings IS 'User settings, subscription tier, and preferences';
+COMMENT ON TABLE public.user_settings IS 'User settings and preferences (billing moved to separate table)';
 COMMENT ON COLUMN public.user_settings.encrypted_api_key IS 'Encrypted Anthropic API key (BYOK)';
-COMMENT ON COLUMN public.user_settings.user_type IS 'Educational role: student, parent, teacher, school, or individual';
-COMMENT ON COLUMN public.user_settings.hide_ai_responses IS 'User preference to hide AI responses by default';
+COMMENT ON COLUMN public.user_settings.user_type IS 'Educational role: student, parent, teacher, school, individual';
+COMMENT ON COLUMN public.user_settings.hide_ai_responses IS 'User preference to hide AI responses by default (Student Mode)';
 COMMENT ON COLUMN public.user_settings.custom_system_prompt IS 'User-customized system prompt (overrides default tutor prompt)';
 
 -- ============================================================================
--- TABLE: billing (SEPARATE for Stripe webhook pattern)
+-- TABLE: billing (SEPARATE for Stripe Webhook Pattern)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.billing (
+CREATE TABLE public.billing (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- Stripe IDs
   stripe_customer_id TEXT UNIQUE,
   stripe_subscription_id TEXT UNIQUE,
+
+  -- Subscription status
   subscription_status TEXT NOT NULL DEFAULT 'inactive'
     CHECK (subscription_status IN ('active', 'inactive', 'past_due', 'canceled', 'trialing')),
   current_period_start TIMESTAMPTZ,
   current_period_end TIMESTAMPTZ,
+
+  -- Usage tracking (reset monthly)
   tokens_used_this_period INTEGER NOT NULL DEFAULT 0,
+
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_billing_user_id ON public.billing(user_id);
-CREATE INDEX IF NOT EXISTS idx_billing_stripe_customer ON public.billing(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_billing_stripe_subscription ON public.billing(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
+CREATE INDEX idx_billing_user_id ON public.billing(user_id);
+CREATE INDEX idx_billing_stripe_customer ON public.billing(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+CREATE INDEX idx_billing_stripe_subscription ON public.billing(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
 
 COMMENT ON TABLE public.billing IS 'Billing and subscription data (separate table for Stripe webhook updates)';
 COMMENT ON COLUMN public.billing.stripe_customer_id IS 'Stripe Customer ID (cus_xxx)';
 COMMENT ON COLUMN public.billing.stripe_subscription_id IS 'Stripe Subscription ID (sub_xxx)';
+COMMENT ON COLUMN public.billing.subscription_status IS 'Current subscription status from Stripe';
 COMMENT ON COLUMN public.billing.tokens_used_this_period IS 'API tokens used in current billing period';
+
+-- ============================================================================
+-- STRIPE WEBHOOK PATTERN
+-- ============================================================================
+-- Design Pattern for Stripe Webhooks:
+--
+-- 1. Webhook Endpoint: POST /api/webhooks/stripe
+-- 2. Verify webhook signature using stripe.webhooks.constructEvent()
+-- 3. Handle events:
+--    - customer.created → INSERT INTO billing
+--    - customer.subscription.created → UPDATE billing SET stripe_subscription_id
+--    - customer.subscription.updated → UPDATE billing SET subscription_status, current_period_*
+--    - customer.subscription.deleted → UPDATE billing SET subscription_status = 'canceled'
+--    - invoice.payment_succeeded → No action (status already updated by subscription.updated)
+--    - invoice.payment_failed → UPDATE billing SET subscription_status = 'past_due'
+--
+-- 4. Use service role key for webhook updates (bypass RLS)
+-- 5. Log all webhook events for debugging
+--
+-- Example webhook handler:
+-- ```typescript
+-- const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+-- const sig = request.headers.get('stripe-signature');
+-- const event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+--
+-- switch (event.type) {
+--   case 'customer.subscription.updated':
+--     const subscription = event.data.object;
+--     await supabase.from('billing')
+--       .update({
+--         subscription_status: subscription.status,
+--         current_period_start: new Date(subscription.current_period_start * 1000),
+--         current_period_end: new Date(subscription.current_period_end * 1000)
+--       })
+--       .eq('stripe_customer_id', subscription.customer);
+--     break;
+-- }
+-- ```
+-- ============================================================================
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -337,28 +407,24 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger: Update notebooks.updated_at
-DROP TRIGGER IF EXISTS update_notebooks_updated_at ON public.notebooks;
 CREATE TRIGGER update_notebooks_updated_at
   BEFORE UPDATE ON public.notebooks
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
 -- Trigger: Update user_handwriting.updated_at
-DROP TRIGGER IF EXISTS update_user_handwriting_updated_at ON public.user_handwriting;
 CREATE TRIGGER update_user_handwriting_updated_at
   BEFORE UPDATE ON public.user_handwriting
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
 -- Trigger: Update user_settings.updated_at
-DROP TRIGGER IF EXISTS update_user_settings_updated_at ON public.user_settings;
 CREATE TRIGGER update_user_settings_updated_at
   BEFORE UPDATE ON public.user_settings
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
 -- Trigger: Update billing.updated_at
-DROP TRIGGER IF EXISTS update_billing_updated_at ON public.billing;
 CREATE TRIGGER update_billing_updated_at
   BEFORE UPDATE ON public.billing
   FOR EACH ROW
@@ -432,7 +498,12 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 -- COMPLETE! 🎉
 -- ============================================================================
--- Schema is now ready. All tables use UUID and reference auth.users(id).
--- Educational features added: user_type, hide_ai_responses, is_ai_generated
--- Billing separated for Stripe webhook pattern
+-- Schema is now aligned with Cursive's educational values:
+-- ✅ Educational Integrity: is_ai_generated, hide_ai_responses, user_type
+-- ✅ Transparent AI: custom_system_prompt
+-- ✅ UUID architecture (Supabase best practice)
+-- ✅ auth.users (no public.users anti-pattern)
+-- ✅ Separate billing table (Stripe webhook pattern)
 -- ============================================================================
+
+SELECT 'Values Alignment Migration Complete!' as status;
