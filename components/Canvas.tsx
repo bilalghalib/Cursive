@@ -429,15 +429,56 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
 
     canvas.setPointerCapture(e.pointerId);
 
-    // Always draw in this simplified version (no tool switching)
     const { x, y } = getCanvasCoords(e);
-    actions.startDrawing({ x, y, pressure: e.pressure });
+    const { x: screenX, y: screenY } = getScreenCoords(e);
+
+    // Handle based on current tool
+    switch (state.currentTool) {
+      case 'draw':
+        actions.startDrawing({ x, y, pressure: e.pressure });
+        break;
+      case 'lasso':
+        actions.startLasso({ x, y, pressure: e.pressure });
+        break;
+      case 'select':
+        actions.startSelection(x, y);
+        break;
+      case 'pan':
+        actions.startPan(screenX, screenY);
+        break;
+      case 'zoom':
+        // Zoom handled via wheel event
+        break;
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (state.currentStroke.length > 0) {
-      const { x, y } = getCanvasCoords(e);
-      actions.continueDrawing({ x, y, pressure: e.pressure });
+    const { x, y } = getCanvasCoords(e);
+    const { x: screenX, y: screenY } = getScreenCoords(e);
+
+    // Handle based on current tool
+    switch (state.currentTool) {
+      case 'draw':
+        if (state.currentStroke.length > 0) {
+          actions.continueDrawing({ x, y, pressure: e.pressure });
+        }
+        break;
+      case 'lasso':
+        if (state.currentStroke.length > 0) {
+          actions.continueLasso({ x, y, pressure: e.pressure });
+        }
+        break;
+      case 'select':
+        if (state.selectionRect) {
+          actions.updateSelection(x, y);
+        }
+        break;
+      case 'pan':
+        actions.updatePan(screenX, screenY);
+        break;
+      case 'zoom':
+        // Zoom handled via wheel event
+        break;
     }
   };
 
@@ -447,22 +488,51 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
 
     canvas.releasePointerCapture(e.pointerId);
 
-    if (state.currentStroke.length > 0) {
-      const gestureResult = detectCircleGesture(state.currentStroke);
+    // Handle based on current tool
+    switch (state.currentTool) {
+      case 'draw':
+        // Check for circle gestures
+        if (state.currentStroke.length > 0) {
+          const gestureResult = detectCircleGesture(state.currentStroke);
 
-      if (gestureResult.isGesture && gestureResult.confidence > 0.5) {
-        // Detected circle gesture!
-        if (gestureResult.gestureType === 'double_circle') {
-          // Double circle: Send all new strokes immediately
-          await handleDoubleCircleSend();
-        } else if (gestureResult.gestureType === 'circle') {
-          // Single circle: Create lasso selection
-          handleSingleCircleSelection();
+          if (gestureResult.isGesture && gestureResult.confidence > 0.5) {
+            // Detected circle gesture!
+            if (gestureResult.gestureType === 'double_circle') {
+              // Double circle: Send all new strokes immediately
+              await handleDoubleCircleSend();
+            } else if (gestureResult.gestureType === 'circle') {
+              // Single circle: Create lasso selection
+              handleSingleCircleSelection();
+            }
+          } else {
+            // Not a gesture, just add as regular stroke
+            actions.finishDrawing();
+          }
         }
-      } else {
-        // Not a gesture, just add as regular stroke
-        actions.finishDrawing();
-      }
+        break;
+
+      case 'lasso':
+        // Finish lasso selection
+        if (state.currentStroke.length > 0) {
+          actions.finishLasso();
+        }
+        break;
+
+      case 'select':
+        // Finish rectangular selection
+        if (state.selectionRect) {
+          // Get the image data from the selected region
+          actions.finishSelection();
+        }
+        break;
+
+      case 'pan':
+        actions.finishPan();
+        break;
+
+      case 'zoom':
+        // Zoom is handled via wheel events
+        break;
     }
   };
 
@@ -656,6 +726,22 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     actions.clearLasso();
   };
 
+  // Wheel event handler for zooming
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const centerX = e.clientX - rect.left;
+    const centerY = e.clientY - rect.top;
+
+    // Negative deltaY means zoom in, positive means zoom out
+    const delta = -e.deltaY;
+    actions.zoom(delta, centerX, centerY);
+  };
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -713,6 +799,7 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerOut={handlePointerUp}
+          onWheel={handleWheel}
         />
 
         {/* Lasso Selection UI */}
