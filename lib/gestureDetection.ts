@@ -25,18 +25,16 @@ let lastCircleTimestamp: number = 0;
 const DOUBLE_CIRCLE_WINDOW_MS = 1000; // 1 second window
 
 /**
- * Detect if a stroke is a fast circle gesture
+ * Detect if a stroke is a fast circle gesture using directional changes
  *
- * Criteria:
- * - Completes in < 0.8s
- * - Start and end points within 20px
- * - Path length / diameter ratio > 2.5 (ensures it's circular, not just 2 points)
- * - Average speed > 200px/s
+ * New approach: Track directional changes instead of perfect circle shape
+ * - Divide circle into 8 sectors (N, NE, E, SE, S, SW, W, NW)
+ * - Check if we visit at least 6 different sectors in sequence
+ * - Must complete in < 1 second
+ * - Must be closed (start/end within 30px)
+ * - Fast enough (average speed > 150px/s)
  *
- * Returns:
- * - 'double_circle' if this is the 2nd circle within 1 second (send all to AI)
- * - 'circle' if this is a single fast circle (becomes lasso selection)
- * - 'none' if not a gesture
+ * This is more permissive than the old "perfect shape" approach
  */
 export function detectCircleGesture(points: Point[]): GestureResult {
   if (points.length < 10) {
@@ -50,13 +48,13 @@ export function detectCircleGesture(points: Point[]): GestureResult {
 
   const duration = endTime - startTime;
 
-  // Check if stroke is closed (start/end within 20px)
+  // Check if stroke is closed (start/end within 30px - more permissive)
   const distanceToClose = Math.sqrt(
     Math.pow(lastPoint.x - firstPoint.x, 2) +
     Math.pow(lastPoint.y - firstPoint.y, 2)
   );
 
-  if (distanceToClose > 20) {
+  if (distanceToClose > 30) {
     return { isGesture: false, gestureType: 'none', confidence: 0 };
   }
 
@@ -68,56 +66,95 @@ export function detectCircleGesture(points: Point[]): GestureResult {
     pathLength += Math.sqrt(dx * dx + dy * dy);
   }
 
-  // Calculate bounding box to get diameter
-  const xs = points.map(p => p.x);
-  const ys = points.map(p => p.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const width = maxX - minX;
-  const height = maxY - minY;
-  const diameter = Math.max(width, height);
-
-  // Check path length to diameter ratio (circle should be > 2.5, ideally ~3.14)
-  const ratio = diameter > 0 ? pathLength / diameter : 0;
-  if (ratio < 2.5) {
-    return { isGesture: false, gestureType: 'none', confidence: 0 };
-  }
-
   // Calculate average speed (px/ms)
   const averageSpeed = duration > 0 ? pathLength / duration : 0;
 
-  // Fast circle criteria
-  const isFast = duration < 800 && averageSpeed > 0.2; // 0.2 px/ms = 200 px/s
-
-  if (isFast) {
-    // Calculate confidence based on how circular and fast it is
-    const circularityScore = Math.min(ratio / 3.14, 1); // Ideal circle = π
-    const speedScore = Math.min(averageSpeed / 0.5, 1); // Cap at 0.5 px/ms
-    const confidence = (circularityScore + speedScore) / 2;
-
-    // Check if this is a double circle (2nd circle within 1 second)
-    const now = Date.now();
-    const timeSinceLastCircle = now - lastCircleTimestamp;
-    const isDoubleCircle = timeSinceLastCircle < DOUBLE_CIRCLE_WINDOW_MS;
-
-    // Update last circle timestamp
-    lastCircleTimestamp = now;
-
-    return {
-      isGesture: true,
-      gestureType: isDoubleCircle ? 'double_circle' : 'circle',
-      confidence,
-      metadata: {
-        duration,
-        averageSpeed,
-        diameter
-      }
-    };
+  // Must be fast enough (0.15 px/ms = 150 px/s, more permissive)
+  if (duration > 1000 || averageSpeed < 0.15) {
+    return { isGesture: false, gestureType: 'none', confidence: 0 };
   }
 
-  return { isGesture: false, gestureType: 'none', confidence: 0 };
+  // Calculate center of the path
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
+  const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+  // Track which sectors (octants) we've visited
+  // 0=E, 1=NE, 2=N, 3=NW, 4=W, 5=SW, 6=S, 7=SE
+  const visitedSectors = new Set<number>();
+  const sectorSequence: number[] = [];
+
+  points.forEach(point => {
+    const dx = point.x - centerX;
+    const dy = point.y - centerY;
+
+    // Calculate angle in radians (-π to π)
+    const angle = Math.atan2(dy, dx);
+
+    // Convert to sector (0-7)
+    // Divide circle into 8 equal parts
+    const sector = Math.floor(((angle + Math.PI) / (2 * Math.PI)) * 8) % 8;
+
+    visitedSectors.add(sector);
+    if (sectorSequence.length === 0 || sectorSequence[sectorSequence.length - 1] !== sector) {
+      sectorSequence.push(sector);
+    }
+  });
+
+  // Check if we visited enough sectors (at least 6 out of 8 = 3/4 of circle)
+  const sectorsVisited = visitedSectors.size;
+  if (sectorsVisited < 6) {
+    return { isGesture: false, gestureType: 'none', confidence: 0 };
+  }
+
+  // Check if sectors are in a roughly circular order
+  // Look for transitions that go around the circle
+  let circularTransitions = 0;
+  for (let i = 1; i < sectorSequence.length; i++) {
+    const prev = sectorSequence[i - 1];
+    const curr = sectorSequence[i];
+
+    // Check if we moved to an adjacent sector (wrapping around)
+    const diff = (curr - prev + 8) % 8;
+    if (diff === 1 || diff === 7) { // Moving forward or backward by 1
+      circularTransitions++;
+    }
+  }
+
+  // Should have mostly circular transitions
+  const transitionRatio = sectorSequence.length > 0 ? circularTransitions / sectorSequence.length : 0;
+  if (transitionRatio < 0.5) {
+    return { isGesture: false, gestureType: 'none', confidence: 0 };
+  }
+
+  // Calculate confidence based on:
+  // - How many sectors visited (more = better)
+  // - How circular the transitions are (more circular = better)
+  // - Speed (faster = more intentional)
+  const sectorScore = Math.min(sectorsVisited / 8, 1);
+  const transitionScore = transitionRatio;
+  const speedScore = Math.min(averageSpeed / 0.3, 1);
+  const confidence = (sectorScore + transitionScore + speedScore) / 3;
+
+  // Check if this is a double circle (2nd circle within 1 second)
+  const now = Date.now();
+  const timeSinceLastCircle = now - lastCircleTimestamp;
+  const isDoubleCircle = timeSinceLastCircle < DOUBLE_CIRCLE_WINDOW_MS;
+
+  // Update last circle timestamp
+  lastCircleTimestamp = now;
+
+  return {
+    isGesture: true,
+    gestureType: isDoubleCircle ? 'double_circle' : 'circle',
+    confidence,
+    metadata: {
+      duration,
+      averageSpeed,
+      diameter: Math.max(...xs) - Math.min(...xs)
+    }
+  };
 }
 
 /**

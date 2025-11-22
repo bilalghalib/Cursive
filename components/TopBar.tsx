@@ -5,26 +5,22 @@ import { ChevronDown, HelpCircle, Book, FileText, Edit2, Check, X, MoreVertical,
 import type { Page, CanvasState, CanvasActions } from '@/lib/types';
 
 interface TopBarProps {
-  notebookTitle: string;
   pages: Page[];
   currentPageId: string;
   state: CanvasState;
   actions: CanvasActions;
   onPageChange: (pageId: string) => void;
   onPageTitleUpdate: (pageId: string, title: string) => void;
-  onNotebookChange?: (notebookId: string) => void;
   onHelpClick?: () => void;
 }
 
 export function TopBar({
-  notebookTitle,
   pages,
   currentPageId,
   state,
   actions,
   onPageChange,
   onPageTitleUpdate,
-  onNotebookChange,
   onHelpClick
 }: TopBarProps) {
   const [showNotebooks, setShowNotebooks] = useState(false);
@@ -32,9 +28,15 @@ export function TopBar({
   const [showSettings, setShowSettings] = useState(false);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [editingNotebookId, setEditingNotebookId] = useState<string | null>(null);
+  const [editNotebookTitle, setEditNotebookTitle] = useState('');
 
+  const currentNotebook = state.notebooks.find(n => n.id === state.currentNotebookId);
   const currentPage = pages.find(p => p.id === currentPageId);
-  const currentPageNumber = pages.findIndex(p => p.id === currentPageId) + 1;
+
+  // Get pages for current notebook only
+  const currentNotebookPages = pages.filter(p => p.notebookId === state.currentNotebookId);
+  const currentPageNumber = currentNotebookPages.findIndex(p => p.id === currentPageId) + 1;
 
   const handleStartEdit = (page: Page) => {
     setEditingPageId(page.id);
@@ -53,10 +55,33 @@ export function TopBar({
     setEditTitle('');
   };
 
+  const handleStartNotebookEdit = (notebookId: string, title: string) => {
+    setEditingNotebookId(notebookId);
+    setEditNotebookTitle(title);
+  };
+
+  const handleSaveNotebookEdit = () => {
+    if (editingNotebookId) {
+      actions.updateNotebookTitle(editingNotebookId, editNotebookTitle.trim());
+      setEditingNotebookId(null);
+    }
+  };
+
+  const handleCancelNotebookEdit = () => {
+    setEditingNotebookId(null);
+    setEditNotebookTitle('');
+  };
+
   return (
     <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
-      {/* Left: Notebook & Page */}
+      {/* Left: Cursive Brand, Notebook & Page */}
       <div className="flex items-center gap-3">
+        {/* Brand */}
+        <div className="font-['Caveat'] text-2xl font-bold text-gray-800 mr-2">
+          Cursive
+        </div>
+
+        <div className="w-px h-5 bg-gray-300" />
         {/* Notebook Selector */}
         <div className="relative">
           <button
@@ -64,16 +89,95 @@ export function TopBar({
             className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 rounded-md transition-colors text-sm font-medium text-gray-700"
           >
             <Book className="w-4 h-4" />
-            <span>{notebookTitle}</span>
+            <span>{currentNotebook?.title || 'My Notebook'}</span>
             <ChevronDown className="w-3 h-3 text-gray-500" />
           </button>
 
-          {/* Notebook Dropdown (placeholder for now) */}
+          {/* Notebook Dropdown */}
           {showNotebooks && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[200px] z-50">
-              <div className="px-3 py-2 text-sm text-gray-500">
-                More notebooks coming soon...
-              </div>
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[250px] max-h-[400px] overflow-y-auto z-50">
+              {/* Add New Notebook Button */}
+              <button
+                onClick={() => {
+                  actions.addNotebook();
+                  setShowNotebooks(false);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 border-b border-gray-200 font-medium"
+              >
+                <span className="text-lg">+</span>
+                <span>Add New Notebook</span>
+              </button>
+
+              {state.notebooks.map((notebook) => {
+                const isEditing = editingNotebookId === notebook.id;
+                const isCurrent = notebook.id === state.currentNotebookId;
+
+                return (
+                  <div
+                    key={notebook.id}
+                    className={`
+                      flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors
+                      ${isCurrent ? 'bg-blue-50' : ''}
+                    `}
+                  >
+                    {isEditing ? (
+                      // Edit mode
+                      <div className="flex-1 flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editNotebookTitle}
+                          onChange={(e) => setEditNotebookTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveNotebookEdit();
+                            if (e.key === 'Escape') handleCancelNotebookEdit();
+                          }}
+                          placeholder="Notebook title"
+                          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleSaveNotebookEdit}
+                          className="p-1 hover:bg-green-100 rounded transition-colors"
+                        >
+                          <Check className="w-4 h-4 text-green-600" />
+                        </button>
+                        <button
+                          onClick={handleCancelNotebookEdit}
+                          className="p-1 hover:bg-red-100 rounded transition-colors"
+                        >
+                          <X className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
+                    ) : (
+                      // View mode
+                      <>
+                        <button
+                          onClick={() => {
+                            actions.goToNotebook(notebook.id);
+                            setShowNotebooks(false);
+                          }}
+                          className="flex-1 text-left text-sm"
+                        >
+                          <div className="font-medium text-gray-900">
+                            {notebook.title}
+                            {isCurrent && <span className="text-blue-600 ml-2">•</span>}
+                          </div>
+                          {notebook.description && (
+                            <div className="text-xs text-gray-600">{notebook.description}</div>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleStartNotebookEdit(notebook.id, notebook.title)}
+                          className="p-1 hover:bg-gray-200 rounded transition-colors"
+                          title="Edit notebook title"
+                        >
+                          <Edit2 className="w-3 h-3 text-gray-500" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -97,7 +201,19 @@ export function TopBar({
           {/* Pages Dropdown */}
           {showPages && (
             <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[250px] max-h-[400px] overflow-y-auto z-50">
-              {pages.map((page, index) => {
+              {/* Add New Page Button */}
+              <button
+                onClick={() => {
+                  actions.addPage();
+                  setShowPages(false);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 border-b border-gray-200 font-medium"
+              >
+                <span className="text-lg">+</span>
+                <span>Add New Page</span>
+              </button>
+
+              {currentNotebookPages.map((page, index) => {
                 const isEditing = editingPageId === page.id;
                 const isCurrent = page.id === currentPageId;
 
@@ -192,7 +308,7 @@ export function TopBar({
                   actions.toggleHideAIResponses();
                   setShowSettings(false);
                 }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-3"
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
               >
                 {state.hideAIResponses ? (
                   <Eye className="w-4 h-4 text-gray-600" />
@@ -212,7 +328,7 @@ export function TopBar({
                   alert('Export feature coming soon!');
                   setShowSettings(false);
                 }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-3"
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
               >
                 <Download className="w-4 h-4 text-gray-600" />
                 <span>Export Page</span>

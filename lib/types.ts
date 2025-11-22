@@ -66,6 +66,18 @@ export interface TrainingMode {
   style: 'print' | 'cursive'; // Writing style
 }
 
+// Notebook system (collection of pages)
+export interface Notebook {
+  id: string;
+  userId?: string;          // Optional: only set when authenticated
+  title: string;
+  description?: string;
+  isShared: boolean;
+  shareId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // Page system (A4-sized pages in notebook)
 export interface Page {
   id: string;
@@ -119,6 +131,10 @@ export interface CanvasState {
   // Tool state
   currentTool: Tool;
 
+  // Notebook system
+  notebooks: Notebook[];
+  currentNotebookId: string;
+
   // Page system
   pages: Page[];
   currentPageId: string;
@@ -156,6 +172,12 @@ export interface CanvasState {
 export interface CanvasActions {
   // Tool actions
   setTool: (tool: Tool) => void;
+
+  // Notebook actions
+  addNotebook: (title?: string) => void;
+  deleteNotebook: (notebookId: string) => void;
+  goToNotebook: (notebookId: string) => void;
+  updateNotebookTitle: (notebookId: string, title: string) => void;
 
   // Page actions
   addPage: () => void;

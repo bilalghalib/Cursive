@@ -680,8 +680,15 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
         setShowHelp(prev => !prev);
       }
 
-      // Escape to clear selection or lasso
-      if (e.key === 'Escape') {
+      // X or Escape to close help menu
+      if ((e.key === 'x' || e.key === 'X' || e.key === 'Escape') && showHelp) {
+        e.preventDefault();
+        setShowHelp(false);
+        return;
+      }
+
+      // Escape to clear selection or lasso (if help not showing)
+      if (e.key === 'Escape' && !showHelp) {
         if (state.lassoSelection) {
           actions.clearLasso();
         } else if (state.selectionRect) {
@@ -711,7 +718,6 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     <div className="flex flex-col h-screen bg-gray-100">
       {/* Top Bar */}
       <TopBar
-        notebookTitle="My Notebook" // TODO: Get from actual notebook
         pages={state.pages}
         currentPageId={state.currentPageId}
         state={state}
@@ -742,9 +748,20 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
           />
         )}
 
+        {/* Add New Page Button (Bottom) */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
+          <button
+            onClick={() => actions.addPage()}
+            className="bg-white border-2 border-gray-300 text-gray-700 px-6 py-3 rounded-full shadow-lg hover:shadow-xl hover:border-blue-500 hover:text-blue-600 transition-all flex items-center gap-2 font-medium"
+          >
+            <span className="text-xl">+</span>
+            <span>Add New Page</span>
+          </button>
+        </div>
+
         {/* AI Loading Indicator */}
         {isAIProcessing && (
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 animate-pulse">
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 animate-pulse z-20">
             <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
             <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
             <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>

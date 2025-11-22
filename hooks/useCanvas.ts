@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions, TypographyGuides, TrainingMode, Page, LassoSelection } from '@/lib/types';
+import type { Tool, Point, Stroke, SelectionRect, ChatMessage, TextOverlay, CanvasState, CanvasActions, TypographyGuides, TrainingMode, Page, Notebook, LassoSelection } from '@/lib/types';
 import { TRAINING, CANVAS, PAGE } from '@/lib/constants';
 import { isValidStroke, sanitizeStroke } from '@/lib/validation';
 
@@ -20,10 +20,23 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
   // Tool state
   const [currentTool, setCurrentTool] = useState<Tool>('draw');
 
+  // Notebook system state
+  const [notebooks, setNotebooks] = useState<Notebook[]>([{
+    id: 'notebook-1',
+    userId: undefined,
+    title: 'My Notebook',
+    description: undefined,
+    isShared: false,
+    shareId: undefined,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  }]);
+  const [currentNotebookId, setCurrentNotebookId] = useState<string>('notebook-1');
+
   // Page system state
   const [pages, setPages] = useState<Page[]>([{
     id: 'page-1',
-    notebookId: 'notebook-1', // TODO: Get from actual notebook
+    notebookId: 'notebook-1',
     pageNumber: 1,
     title: undefined,
     size: PAGE.DEFAULT_SIZE,
@@ -100,12 +113,84 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       }
     }, []),
 
-    // Page actions
-    addPage: useCallback(() => {
-      const newPageNumber = pages.length + 1;
+    // Notebook actions
+    addNotebook: useCallback((title?: string) => {
+      const newNotebook: Notebook = {
+        id: `notebook-${Date.now()}`,
+        userId: undefined,
+        title: title || `Notebook ${notebooks.length + 1}`,
+        description: undefined,
+        isShared: false,
+        shareId: undefined,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      setNotebooks(prev => [...prev, newNotebook]);
+
+      // Create first page for new notebook
       const newPage: Page = {
         id: `page-${Date.now()}`,
-        notebookId: pages[0]?.notebookId || 'notebook-1',
+        notebookId: newNotebook.id,
+        pageNumber: 1,
+        title: undefined,
+        size: PAGE.DEFAULT_SIZE,
+        orientation: PAGE.DEFAULT_ORIENTATION,
+        backgroundColor: PAGE.DEFAULT_BACKGROUND,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      setPages(prev => [...prev, newPage]);
+
+      // Switch to new notebook and page
+      setCurrentNotebookId(newNotebook.id);
+      setCurrentPageId(newPage.id);
+    }, [notebooks]),
+
+    deleteNotebook: useCallback((notebookId: string) => {
+      if (notebooks.length === 1) {
+        alert('Cannot delete the last notebook');
+        return;
+      }
+      setNotebooks(prev => prev.filter(n => n.id !== notebookId));
+
+      // Remove all pages from this notebook
+      setPages(prev => prev.filter(p => p.notebookId !== notebookId));
+
+      // If deleting current notebook, switch to another
+      if (notebookId === currentNotebookId) {
+        const remainingNotebook = notebooks.find(n => n.id !== notebookId);
+        if (remainingNotebook) {
+          setCurrentNotebookId(remainingNotebook.id);
+          const firstPage = pages.find(p => p.notebookId === remainingNotebook.id);
+          if (firstPage) setCurrentPageId(firstPage.id);
+        }
+      }
+    }, [notebooks, currentNotebookId, pages]),
+
+    goToNotebook: useCallback((notebookId: string) => {
+      setCurrentNotebookId(notebookId);
+
+      // Switch to first page of this notebook
+      const firstPage = pages.find(p => p.notebookId === notebookId);
+      if (firstPage) {
+        setCurrentPageId(firstPage.id);
+      }
+    }, [pages]),
+
+    updateNotebookTitle: useCallback((notebookId: string, title: string) => {
+      setNotebooks(prev => prev.map(n =>
+        n.id === notebookId ? { ...n, title: title || 'Untitled Notebook', updatedAt: Date.now() } : n
+      ));
+    }, []),
+
+    // Page actions
+    addPage: useCallback(() => {
+      // Get pages in current notebook only
+      const currentNotebookPages = pages.filter(p => p.notebookId === currentNotebookId);
+      const newPageNumber = currentNotebookPages.length + 1;
+      const newPage: Page = {
+        id: `page-${Date.now()}`,
+        notebookId: currentNotebookId,
         pageNumber: newPageNumber,
         title: undefined,
         size: PAGE.DEFAULT_SIZE,
@@ -116,7 +201,7 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
       };
       setPages(prev => [...prev, newPage]);
       setCurrentPageId(newPage.id);
-    }, [pages]),
+    }, [pages, currentNotebookId]),
 
     deletePage: useCallback((pageId: string) => {
       if (pages.length === 1) {
@@ -521,6 +606,8 @@ export function useCanvas(): [CanvasState, CanvasActions, React.RefObject<HTMLCa
 
   const state: CanvasState = {
     currentTool,
+    notebooks,
+    currentNotebookId,
     pages,
     currentPageId,
     drawings,
