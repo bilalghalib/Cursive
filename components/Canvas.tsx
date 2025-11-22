@@ -450,13 +450,24 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
     if (state.currentStroke.length > 0) {
       const gestureResult = detectCircleGesture(state.currentStroke);
 
+      console.log('Gesture detection result:', {
+        isGesture: gestureResult.isGesture,
+        type: gestureResult.gestureType,
+        confidence: gestureResult.confidence,
+        pointsCount: state.currentStroke.length,
+        metadata: gestureResult.metadata
+      });
+
       if (gestureResult.isGesture && gestureResult.confidence > 0.5) {
         // Detected circle gesture!
+        console.log('✅ Gesture detected:', gestureResult.gestureType);
         if (gestureResult.gestureType === 'double_circle') {
           // Double circle: Send all new strokes immediately
+          console.log('🔄 Double circle - sending all new strokes');
           await handleDoubleCircleSend();
         } else if (gestureResult.gestureType === 'circle') {
           // Single circle: Create lasso selection
+          console.log('⭕ Single circle - creating lasso selection');
           handleSingleCircleSelection();
         }
       } else {
@@ -544,7 +555,9 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
 
   // Handle single circle: Select strokes inside
   const handleSingleCircleSelection = () => {
+    console.log('Finding strokes in circle. Total drawings:', state.drawings.length);
     const selectedIndices = findStrokesInCircle(state.drawings, state.currentStroke);
+    console.log('Selected stroke indices:', selectedIndices);
 
     if (selectedIndices.length > 0) {
       const bounds = calculatePointsBounds(state.currentStroke);
@@ -555,10 +568,12 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
         pageId: state.currentPageId
       };
 
+      console.log('✅ Creating lasso selection with', selectedIndices.length, 'strokes');
       actions.setLassoSelection(lassoSelection);
       actions.finishDrawing();
     } else {
       // No strokes inside, just add circle as regular drawing
+      console.log('⚠️ No strokes found inside circle, adding as regular drawing');
       actions.finishDrawing();
     }
   };
@@ -699,6 +714,8 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
         notebookTitle="My Notebook" // TODO: Get from actual notebook
         pages={state.pages}
         currentPageId={state.currentPageId}
+        state={state}
+        actions={actions}
         onPageChange={actions.goToPage}
         onPageTitleUpdate={actions.updatePageTitle}
         onHelpClick={() => setShowHelp(true)}
