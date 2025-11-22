@@ -699,6 +699,8 @@ export function Canvas({ state, actions, canvasRef }: CanvasProps) {
         notebookTitle="My Notebook" // TODO: Get from actual notebook
         pages={state.pages}
         currentPageId={state.currentPageId}
+        state={state}
+        actions={actions}
         onPageChange={actions.goToPage}
         onPageTitleUpdate={actions.updatePageTitle}
         onHelpClick={() => setShowHelp(true)}

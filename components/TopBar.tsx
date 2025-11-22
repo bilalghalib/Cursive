@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, HelpCircle, Book, FileText, Edit2, Check, X } from 'lucide-react';
-import type { Page } from '@/lib/types';
+import { ChevronDown, HelpCircle, Book, FileText, Edit2, Check, X, MoreVertical, Eye, EyeOff, Download, Upload, Trash2 } from 'lucide-react';
+import type { Page, CanvasState, CanvasActions } from '@/lib/types';
 
 interface TopBarProps {
   notebookTitle: string;
   pages: Page[];
   currentPageId: string;
+  state: CanvasState;
+  actions: CanvasActions;
   onPageChange: (pageId: string) => void;
   onPageTitleUpdate: (pageId: string, title: string) => void;
   onNotebookChange?: (notebookId: string) => void;
@@ -18,6 +20,8 @@ export function TopBar({
   notebookTitle,
   pages,
   currentPageId,
+  state,
+  actions,
   onPageChange,
   onPageTitleUpdate,
   onNotebookChange,
@@ -25,6 +29,7 @@ export function TopBar({
 }: TopBarProps) {
   const [showNotebooks, setShowNotebooks] = useState(false);
   const [showPages, setShowPages] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
@@ -167,22 +172,89 @@ export function TopBar({
         </div>
       </div>
 
-      {/* Right: Help */}
-      <button
-        onClick={onHelpClick}
-        className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-        title="Help & Gestures"
-      >
-        <HelpCircle className="w-5 h-5 text-gray-600" />
-      </button>
+      {/* Right: Settings & Help */}
+      <div className="flex items-center gap-2">
+        {/* Settings Menu */}
+        <div className="relative">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+            title="Settings"
+          >
+            <MoreVertical className="w-5 h-5 text-gray-600" />
+          </button>
+
+          {showSettings && (
+            <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[200px] z-50">
+              {/* Hide AI Toggle */}
+              <button
+                onClick={() => {
+                  actions.toggleHideAIResponses();
+                  setShowSettings(false);
+                }}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-3"
+              >
+                {state.hideAIResponses ? (
+                  <Eye className="w-4 h-4 text-gray-600" />
+                ) : (
+                  <EyeOff className="w-4 h-4 text-gray-600" />
+                )}
+                <span>
+                  {state.hideAIResponses ? 'Show AI Responses' : 'Hide AI Responses'}
+                </span>
+              </button>
+
+              <div className="border-t border-gray-200 my-1" />
+
+              {/* Export/Import (placeholders for now) */}
+              <button
+                onClick={() => {
+                  alert('Export feature coming soon!');
+                  setShowSettings(false);
+                }}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-3"
+              >
+                <Download className="w-4 h-4 text-gray-600" />
+                <span>Export Page</span>
+              </button>
+
+              <div className="border-t border-gray-200 my-1" />
+
+              {/* Clear All */}
+              <button
+                onClick={() => {
+                  if (confirm('Clear all content on this page?')) {
+                    actions.clearAll();
+                    setShowSettings(false);
+                  }
+                }}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 flex items-center gap-3 text-red-600"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Clear All</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Help */}
+        <button
+          onClick={onHelpClick}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title="Help & Gestures"
+        >
+          <HelpCircle className="w-5 h-5 text-gray-600" />
+        </button>
+      </div>
 
       {/* Click outside to close dropdowns */}
-      {(showNotebooks || showPages) && (
+      {(showNotebooks || showPages || showSettings) && (
         <div
           className="fixed inset-0 z-40"
           onClick={() => {
             setShowNotebooks(false);
             setShowPages(false);
+            setShowSettings(false);
           }}
         />
       )}
